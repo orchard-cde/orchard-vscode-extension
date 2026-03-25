@@ -1,0 +1,194 @@
+{
+  "name": "orchard",
+  "displayName": "Orchard",
+  "publisher": "orchard-cde",
+  "version": "0.1.0",
+  "description": "Manage Orchard Cloud Development Environments from VS Code",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./dist/extension.js",
+  "extensionDependencies": [
+    "ms-vscode-remote.remote-ssh"
+  ],
+  "activationEvents": [
+    "onView:orchard.groveExplorer",
+    "onCommand:orchard.grove.create"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "orchard",
+          "title": "Orchard",
+          "icon": "resources/icons/orchard.svg"
+        }
+      ]
+    },
+    "views": {
+      "orchard": [
+        {
+          "id": "orchard.groveExplorer",
+          "name": "Groves"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "orchard.groveExplorer",
+        "contents": "Configure your Orchard server to get started.\n[Open Settings](command:workbench.action.openSettings?%5B%22orchard.serverUrl%22%5D)",
+        "when": "!orchard.configured"
+      },
+      {
+        "view": "orchard.groveExplorer",
+        "contents": "No groves found.\n[Create a Grove](command:orchard.grove.create)",
+        "when": "orchard.configured"
+      }
+    ],
+    "commands": [
+      {
+        "command": "orchard.grove.create",
+        "title": "Orchard: Create Grove",
+        "icon": "$(add)"
+      },
+      {
+        "command": "orchard.grove.connect",
+        "title": "Connect to Grove",
+        "icon": "$(remote-explorer)"
+      },
+      {
+        "command": "orchard.grove.stop",
+        "title": "Stop Grove",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "orchard.grove.start",
+        "title": "Start Grove",
+        "icon": "$(play)"
+      },
+      {
+        "command": "orchard.grove.delete",
+        "title": "Delete Grove",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "orchard.grove.refresh",
+        "title": "Refresh Groves",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "orchard.grove.copyId",
+        "title": "Copy Grove ID"
+      },
+      {
+        "command": "orchard.grove.showDetails",
+        "title": "Show Grove Details"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "orchard.grove.refresh",
+          "when": "view == orchard.groveExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "orchard.grove.create",
+          "when": "view == orchard.groveExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "orchard.grove.connect",
+          "when": "viewItem == grove-flourishing",
+          "group": "inline"
+        },
+        {
+          "command": "orchard.grove.connect",
+          "when": "viewItem == grove-flourishing",
+          "group": "1_actions"
+        },
+        {
+          "command": "orchard.grove.stop",
+          "when": "viewItem == grove-flourishing",
+          "group": "1_actions"
+        },
+        {
+          "command": "orchard.grove.start",
+          "when": "viewItem == grove-dormant",
+          "group": "1_actions"
+        },
+        {
+          "command": "orchard.grove.delete",
+          "when": "viewItem =~ /^grove-(?!clearing|cleared)/",
+          "group": "2_destructive"
+        },
+        {
+          "command": "orchard.grove.copyId",
+          "when": "viewItem =~ /^grove-/",
+          "group": "3_misc"
+        },
+        {
+          "command": "orchard.grove.showDetails",
+          "when": "viewItem =~ /^grove-/",
+          "group": "3_misc"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Orchard",
+      "properties": {
+        "orchard.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Orchard Trellis server URL (e.g., https://orchard.example.com)"
+        },
+        "orchard.cultivatorId": {
+          "type": "string",
+          "default": "",
+          "description": "Cultivator UUID for authentication (must be a valid UUID)"
+        },
+        "orchard.trowelPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Trowel CLI binary (auto-detected if empty)"
+        },
+        "orchard.autoRefreshInterval": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "Seconds between grove list auto-refresh"
+        },
+        "orchard.sseEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Server-Sent Events for real-time grove status updates"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "webpack --mode production",
+    "compile": "webpack --mode development",
+    "watch": "webpack --mode development --watch",
+    "lint": "eslint src",
+    "test": "echo \"no tests yet\"",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0",
+    "ts-loader": "^9.5.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0"
+  },
+  "dependencies": {
+    "eventsource": "^2.0.2"
+  }
+}

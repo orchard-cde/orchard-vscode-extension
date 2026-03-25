@@ -1,0 +1,8 @@
+.vscode/**
+src/**
+node_modules/**
+.gitignore
+tsconfig.json
+webpack.config.js
+eslint.config.mjs
+docs/**
