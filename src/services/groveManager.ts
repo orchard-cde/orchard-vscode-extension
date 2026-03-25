@@ -70,6 +70,7 @@ export class GroveManager implements vscode.Disposable {
     const grove = await this.trellisClient.createGrove(request);
     this.groves.set(grove.id, grove);
     this._onDidChangeGroves.fire();
+    this.updateSseSubscriptions();
     return grove;
   }
 

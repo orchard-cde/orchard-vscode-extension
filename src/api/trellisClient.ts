@@ -15,7 +15,7 @@ export class TrellisClient {
   ) {}
 
   async getMe(): Promise<CultivatorResponse> {
-    return this.request<CultivatorResponse>('GET', '/api/cultivators/me');
+    return this.request<CultivatorResponse>('GET', '/api/me');
   }
 
   async listGroves(): Promise<GroveResponse[]> {
@@ -35,11 +35,11 @@ export class TrellisClient {
   }
 
   async stopGrove(id: string): Promise<GroveResponse> {
-    return this.request<GroveResponse>('POST', `/api/groves/${id}/stop`);
+    return this.request<GroveResponse>('POST', `/api/groves/${id}/actions/stop`);
   }
 
   async startGrove(id: string): Promise<GroveResponse> {
-    return this.request<GroveResponse>('POST', `/api/groves/${id}/start`);
+    return this.request<GroveResponse>('POST', `/api/groves/${id}/actions/start`);
   }
 
   async getSshConfig(id: string): Promise<string> {
@@ -60,11 +60,11 @@ export class TrellisClient {
   }
 
   async getHealth(): Promise<HealthResponse> {
-    return this.request<HealthResponse>('GET', '/actuator/health');
+    return this.request<HealthResponse>('GET', '/api/health');
   }
 
   async getReadiness(): Promise<ReadinessResponse> {
-    return this.request<ReadinessResponse>('GET', '/actuator/health/readiness');
+    return this.request<ReadinessResponse>('GET', '/api/health/ready');
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
