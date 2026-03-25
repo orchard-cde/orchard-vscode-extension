@@ -16,8 +16,16 @@ import { HeaderAuthProvider } from './api/auth/headerAuthProvider';
 import { TrellisClient } from './api/trellisClient';
 import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
+import { GroveTreeItem } from './views/groveTreeItem';
 import { getServerUrl } from './util/configuration';
 import * as logger from './util/logger';
+import { createGrove } from './commands/createGrove';
+import { connectGrove } from './commands/connectGrove';
+import { deleteGrove } from './commands/deleteGrove';
+import { stopGrove } from './commands/stopGrove';
+import { startGrove } from './commands/startGrove';
+import { refreshGroves } from './commands/refreshGroves';
+import { showGroveDetails } from './commands/showGroveDetails';
 
 let authProvider: HeaderAuthProvider | undefined;
 let trellisClient: TrellisClient | undefined;
@@ -72,41 +80,72 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register the tree view
   createTreeView(context, treeDataProvider ?? new EmptyTreeDataProvider());
 
-  // Register command stubs
+  // Register commands
   registerCommand(context, CMD_GROVE_CREATE, () => {
-    vscode.window.showInformationMessage('Orchard: Create Grove (not yet implemented)');
+    if (groveManager) {
+      createGrove(groveManager).catch((err) => {
+        logger.error(`Failed to create grove: ${err}`);
+        vscode.window.showErrorMessage(`Failed to create grove: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
   });
 
-  registerCommand(context, CMD_GROVE_CONNECT, () => {
-    vscode.window.showInformationMessage('Orchard: Connect to Grove (not yet implemented)');
+  registerCommand(context, CMD_GROVE_CONNECT, (item: unknown) => {
+    if (item instanceof GroveTreeItem && trellisClient) {
+      connectGrove(item.grove, trellisClient).catch((err) => {
+        logger.error(`Failed to connect to grove: ${err}`);
+      });
+    }
   });
 
-  registerCommand(context, CMD_GROVE_STOP, () => {
-    vscode.window.showInformationMessage('Orchard: Stop Grove (not yet implemented)');
+  registerCommand(context, CMD_GROVE_STOP, (item: unknown) => {
+    if (item instanceof GroveTreeItem && groveManager) {
+      stopGrove(item.grove, groveManager).catch((err) => {
+        logger.error(`Failed to stop grove: ${err}`);
+        vscode.window.showErrorMessage(`Failed to stop grove: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
   });
 
-  registerCommand(context, CMD_GROVE_START, () => {
-    vscode.window.showInformationMessage('Orchard: Start Grove (not yet implemented)');
+  registerCommand(context, CMD_GROVE_START, (item: unknown) => {
+    if (item instanceof GroveTreeItem && groveManager) {
+      startGrove(item.grove, groveManager).catch((err) => {
+        logger.error(`Failed to start grove: ${err}`);
+        vscode.window.showErrorMessage(`Failed to start grove: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
   });
 
-  registerCommand(context, CMD_GROVE_DELETE, () => {
-    vscode.window.showInformationMessage('Orchard: Delete Grove (not yet implemented)');
+  registerCommand(context, CMD_GROVE_DELETE, (item: unknown) => {
+    if (item instanceof GroveTreeItem && groveManager) {
+      deleteGrove(item.grove, groveManager).catch((err) => {
+        logger.error(`Failed to delete grove: ${err}`);
+        vscode.window.showErrorMessage(`Failed to delete grove: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
   });
 
   registerCommand(context, CMD_GROVE_REFRESH, () => {
     if (groveManager) {
-      groveManager.refresh().catch((err) => {
+      refreshGroves(groveManager).catch((err) => {
         logger.error(`Failed to refresh groves: ${err}`);
       });
     }
   });
 
-  registerCommand(context, CMD_GROVE_COPY_ID, () => {
-    vscode.window.showInformationMessage('Orchard: Copy Grove ID (not yet implemented)');
+  registerCommand(context, CMD_GROVE_COPY_ID, (item: unknown) => {
+    if (item instanceof GroveTreeItem) {
+      vscode.env.clipboard.writeText(item.grove.id);
+      vscode.window.showInformationMessage(`Copied grove ID: ${item.grove.id}`);
+    }
   });
 
-  registerCommand(context, CMD_GROVE_SHOW_DETAILS, () => {
-    vscode.window.showInformationMessage('Orchard: Show Grove Details (not yet implemented)');
+  registerCommand(context, CMD_GROVE_SHOW_DETAILS, (item: unknown) => {
+    if (item instanceof GroveTreeItem) {
+      showGroveDetails(item.grove).catch((err) => {
+        logger.error(`Failed to show grove details: ${err}`);
+      });
+    }
   });
 
   // Listen for configuration changes
