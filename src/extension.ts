@@ -28,6 +28,7 @@ import { stopGrove } from './commands/stopGrove';
 import { startGrove } from './commands/startGrove';
 import { refreshGroves } from './commands/refreshGroves';
 import { showGroveDetails } from './commands/showGroveDetails';
+import { TrowelService } from './services/trowelService';
 
 let authProvider: HeaderAuthProvider | undefined;
 let trellisClient: TrellisClient | undefined;
@@ -110,6 +111,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (item instanceof GroveTreeItem && trellisClient) {
       connectGrove(item.grove, trellisClient).catch((err) => {
         logger.error(`Failed to connect to grove: ${err}`);
+        vscode.window.showErrorMessage(`Failed to connect to grove: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
   });
@@ -145,6 +147,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (groveManager) {
       refreshGroves(groveManager).catch((err) => {
         logger.error(`Failed to refresh groves: ${err}`);
+        vscode.window.showErrorMessage(`Failed to refresh groves: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
   });
@@ -160,6 +163,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (item instanceof GroveTreeItem) {
       showGroveDetails(item.grove).catch((err) => {
         logger.error(`Failed to show grove details: ${err}`);
+        vscode.window.showErrorMessage(`Failed to show grove details: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
   });
@@ -191,10 +195,23 @@ export function activate(context: vscode.ExtensionContext): void {
   // Start polling and initial refresh if configured
   if (groveManager) {
     groveManager.startPolling();
-    groveManager.refresh().catch((err) => {
+    groveManager.refresh().catch(async (err) => {
       logger.error(`Failed initial grove refresh: ${err}`);
+      const action = await vscode.window.showErrorMessage(
+        'Could not connect to Orchard server. Check your server URL.',
+        'Open Settings',
+      );
+      if (action === 'Open Settings') {
+        vscode.commands.executeCommand('workbench.action.openSettings', 'orchard.serverUrl');
+      }
     });
   }
+
+  // Check for Trowel CLI (non-blocking)
+  const trowelService = new TrowelService();
+  trowelService.promptInstallIfMissing().catch((err) => {
+    logger.warn(`Trowel detection failed: ${err}`);
+  });
 
   // Push service disposables
   if (authProvider) {
