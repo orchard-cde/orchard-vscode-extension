@@ -17,7 +17,9 @@ import { TrellisClient } from './api/trellisClient';
 import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
 import { GroveTreeItem } from './views/groveTreeItem';
-import { getServerUrl } from './util/configuration';
+import { getServerUrl, getSseEnabled } from './util/configuration';
+import { SseManager } from './services/sseManager';
+import { createStatusBarItem, updateStatusBar } from './views/statusBar';
 import * as logger from './util/logger';
 import { createGrove } from './commands/createGrove';
 import { connectGrove } from './commands/connectGrove';
@@ -29,6 +31,7 @@ import { showGroveDetails } from './commands/showGroveDetails';
 
 let authProvider: HeaderAuthProvider | undefined;
 let trellisClient: TrellisClient | undefined;
+let sseManager: SseManager | undefined;
 let groveManager: GroveManager | undefined;
 let treeDataProvider: GroveTreeDataProvider | undefined;
 let groveTreeView: vscode.TreeView<unknown> | undefined;
@@ -36,12 +39,20 @@ let groveTreeView: vscode.TreeView<unknown> | undefined;
 function initializeServices(serverUrl: string): void {
   // Dispose previous instances
   authProvider?.dispose();
+  sseManager?.dispose();
   groveManager?.dispose();
   treeDataProvider?.dispose();
 
   authProvider = new HeaderAuthProvider();
   trellisClient = new TrellisClient(serverUrl, authProvider);
-  groveManager = new GroveManager(trellisClient);
+
+  if (getSseEnabled()) {
+    sseManager = new SseManager(serverUrl, authProvider);
+  } else {
+    sseManager = undefined;
+  }
+
+  groveManager = new GroveManager(trellisClient, sseManager);
   treeDataProvider = new GroveTreeDataProvider(groveManager);
 }
 
@@ -76,6 +87,11 @@ export function activate(context: vscode.ExtensionContext): void {
     initializeServices(serverUrl);
     logger.info(`Orchard initialized with server: ${serverUrl}`);
   }
+
+  // Create and register status bar item
+  const statusBarItem = createStatusBarItem();
+  context.subscriptions.push(statusBarItem);
+  updateStatusBar(statusBarItem);
 
   // Register the tree view
   createTreeView(context, treeDataProvider ?? new EmptyTreeDataProvider());
@@ -183,6 +199,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Push service disposables
   if (authProvider) {
     context.subscriptions.push(authProvider);
+  }
+  if (sseManager) {
+    context.subscriptions.push(sseManager);
   }
   if (groveManager) {
     context.subscriptions.push(groveManager);

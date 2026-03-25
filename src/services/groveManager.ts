@@ -2,15 +2,45 @@ import * as vscode from 'vscode';
 import { TrellisClient } from '../api/trellisClient';
 import { CreateGroveRequest, GroveResponse } from '../api/types';
 import { getAutoRefreshInterval } from '../util/configuration';
+import { SseManager } from './sseManager';
+import { isTransitionalState, isTerminalState } from '../models/grove';
+import * as logger from '../util/logger';
 
 export class GroveManager implements vscode.Disposable {
   private readonly groves = new Map<string, GroveResponse>();
   private pollingTimer: ReturnType<typeof setInterval> | undefined;
+  private readonly sseDisposable: vscode.Disposable | undefined;
 
   private readonly _onDidChangeGroves = new vscode.EventEmitter<void>();
   readonly onDidChangeGroves: vscode.Event<void> = this._onDidChangeGroves.event;
 
-  constructor(private readonly trellisClient: TrellisClient) {}
+  constructor(
+    private readonly trellisClient: TrellisClient,
+    private readonly sseManager?: SseManager,
+  ) {
+    if (this.sseManager) {
+      this.sseDisposable = this.sseManager.onGroveStateChanged((event) => {
+        logger.info(
+          `GroveManager: SSE state change for grove ${event.groveId}: ${event.previousState} → ${event.newState}`,
+        );
+
+        // Update the cached grove state
+        const grove = this.groves.get(event.groveId);
+        if (grove) {
+          grove.state = event.newState;
+          this.groves.set(event.groveId, grove);
+        }
+
+        // Refresh the tree view
+        this._onDidChangeGroves.fire();
+
+        // If the grove has reached a terminal state, unsubscribe SSE
+        if (isTerminalState(event.newState)) {
+          this.sseManager!.unsubscribe(event.groveId);
+        }
+      });
+    }
+  }
 
   /** Fetch the full grove list from the API and update the local cache. */
   async refresh(): Promise<void> {
@@ -20,6 +50,7 @@ export class GroveManager implements vscode.Disposable {
       this.groves.set(grove.id, grove);
     }
     this._onDidChangeGroves.fire();
+    this.updateSseSubscriptions();
   }
 
   /** Return all cached groves sorted by name. */
@@ -86,6 +117,25 @@ export class GroveManager implements vscode.Disposable {
 
   dispose(): void {
     this.stopPolling();
+    this.sseDisposable?.dispose();
     this._onDidChangeGroves.dispose();
+  }
+
+  /**
+   * Sync SSE subscriptions with current grove states.
+   * Subscribe to transitional groves, unsubscribe from terminal/stable ones.
+   */
+  private updateSseSubscriptions(): void {
+    if (!this.sseManager) {
+      return;
+    }
+
+    for (const grove of this.groves.values()) {
+      if (isTransitionalState(grove.state)) {
+        this.sseManager.subscribe(grove.id);
+      } else if (isTerminalState(grove.state)) {
+        this.sseManager.unsubscribe(grove.id);
+      }
+    }
   }
 }
