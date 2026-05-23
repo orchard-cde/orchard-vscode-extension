@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { TrellisClient } from '../api/trellisClient';
 import { GroveManager } from '../services/groveManager';
 import { SseManager } from '../services/sseManager';
-import { GroveResponse } from '../api/types';
 import * as logger from '../util/logger';
 
 export class OrchardWebviewProvider implements vscode.Disposable {
@@ -61,7 +61,7 @@ export class OrchardWebviewProvider implements vscode.Disposable {
       vscode.Uri.file(path.join(this.context.extensionPath, 'dist', 'webview')),
     );
 
-    const html = require('fs').readFileSync(webviewPath.fsPath, 'utf-8');
+    const html = fs.readFileSync(webviewPath.fsPath, 'utf-8');
     return html.replace(/<base\s+href=["'].*?["']\s*\/?>/, `<base href="${baseUri}/">`);
   }
 
