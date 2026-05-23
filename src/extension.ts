@@ -29,7 +29,6 @@ import { deleteGrove } from './commands/deleteGrove';
 import { stopGrove } from './commands/stopGrove';
 import { startGrove } from './commands/startGrove';
 import { refreshGroves } from './commands/refreshGroves';
-import { showGroveDetails } from './commands/showGroveDetails';
 import { TrowelService } from './services/trowelService';
 
 let authProvider: HeaderAuthProvider | undefined;
@@ -165,10 +164,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerCommand(context, CMD_GROVE_SHOW_DETAILS, (item: unknown) => {
     if (item instanceof GroveTreeItem) {
-      showGroveDetails(item.grove).catch((err) => {
-        logger.error(`Failed to show grove details: ${err}`);
-        vscode.window.showErrorMessage(`Failed to show grove details: ${err instanceof Error ? err.message : String(err)}`);
-      });
+      webviewProvider?.navigateToGrove(item.grove.id);
     }
   });
 

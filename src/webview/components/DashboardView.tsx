@@ -14,6 +14,7 @@ interface DashboardViewProps {
 
 export function DashboardView({ groves, loading, error, onNavigate, onRefresh, postMessage }: DashboardViewProps): React.ReactElement {
   const [showPlantModal, setShowPlantModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -21,23 +22,29 @@ export function DashboardView({ groves, loading, error, onNavigate, onRefresh, p
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete grove '${name}'? This action cannot be undone.`)) {
-      const handler = (event: MessageEvent) => {
-        const msg = event.data;
-        if (msg.type === 'deleteGrove') {
-          window.removeEventListener('message', handler);
-          if (msg.success) {
-            showToast(`Grove '${name}' deleted`, 'success');
-            onRefresh();
-          } else {
-            showToast(`Failed to delete: ${msg.error}`, 'error');
-          }
+  const handleDeleteConfirm = () => {
+    if (!confirmDelete) { return; }
+    const { id, name } = confirmDelete;
+    setConfirmDelete(null);
+
+    const handler = (event: MessageEvent) => {
+      const msg = event.data;
+      if (msg.type === 'deleteGrove') {
+        window.removeEventListener('message', handler);
+        if (msg.success) {
+          showToast(`Grove '${name}' deleted`, 'success');
+          onRefresh();
+        } else {
+          showToast(`Failed to delete: ${msg.error}`, 'error');
         }
-      };
-      window.addEventListener('message', handler);
-      postMessage('deleteGrove', { id });
-    }
+      }
+    };
+    window.addEventListener('message', handler);
+    postMessage('deleteGrove', { id });
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDelete(null);
   };
 
   return (
@@ -74,7 +81,7 @@ export function DashboardView({ groves, loading, error, onNavigate, onRefresh, p
       ) : (
         <div className="card-grid">
           {groves.map((g) => (
-            <GroveCard key={g.id} grove={g} onNavigate={onNavigate} onDelete={handleDelete} />
+            <GroveCard key={g.id} grove={g} onNavigate={onNavigate} onDelete={(id, name) => setConfirmDelete({ id, name })} onConnect={(id) => postMessage('connectGrove', { id })} />
           ))}
         </div>
       )}
@@ -85,6 +92,19 @@ export function DashboardView({ groves, loading, error, onNavigate, onRefresh, p
           onCreated={() => { setShowPlantModal(false); onRefresh(); }}
           postMessage={postMessage}
         />
+      )}
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={handleDeleteCancel}>
+          <div className="modal confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Grove</h3>
+            <p>Are you sure you want to delete '<strong>{confirmDelete.name}</strong>'? This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button className="btn" onClick={handleDeleteCancel}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDeleteConfirm}>Delete</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && (

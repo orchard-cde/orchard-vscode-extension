@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GroveResponse, GroveState } from '../api/types';
+import { CMD_GROVE_SHOW_DETAILS } from '../constants';
 
 /**
  * Extracts a short repository name from a full URL.
@@ -66,5 +67,10 @@ export class GroveTreeItem extends vscode.TreeItem {
     this.contextValue = `grove-${grove.state.toLowerCase()}`;
     this.iconPath = getIconForState(grove.state);
     this.tooltip = buildTooltip(grove);
+    this.command = {
+      command: CMD_GROVE_SHOW_DETAILS,
+      title: 'Show Grove Details',
+      arguments: [this],
+    };
   }
 }

@@ -5,6 +5,7 @@ import { TrellisClient } from '../api/trellisClient';
 import { GroveManager } from '../services/groveManager';
 import { SseManager } from '../services/sseManager';
 import * as logger from '../util/logger';
+import { connectGrove } from '../commands/connectGrove';
 
 export class OrchardWebviewProvider implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -100,6 +101,15 @@ export class OrchardWebviewProvider implements vscode.Disposable {
           respond(grove);
           break;
         }
+        case 'connectGrove': {
+          const connId = message.payload?.id as string;
+          if (!connId) { respond(undefined, 'Missing grove id'); return; }
+          const grove = this.groveManager.getGrove(connId);
+          if (!grove) { respond(undefined, 'Grove not found'); return; }
+          await connectGrove(grove, this.trellisClient);
+          respond(null);
+          break;
+        }
         case 'deleteGrove': {
           const id = message.payload?.id as string;
           if (!id) { respond(undefined, 'Missing grove id'); return; }
@@ -150,6 +160,15 @@ export class OrchardWebviewProvider implements vscode.Disposable {
         success: true,
         data: event,
       });
+    });
+  }
+
+  navigateToGrove(id: string): void {
+    this.show();
+    this.postMessage({
+      type: 'navigateToGrove',
+      success: true,
+      data: { groveId: id },
     });
   }
 

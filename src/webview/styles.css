@@ -358,6 +358,16 @@ body {
   margin-bottom: var(--spacing);
 }
 
+.modal h3 {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.confirm-dialog p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .form-group {
   margin-bottom: 12px;
 }

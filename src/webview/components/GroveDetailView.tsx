@@ -132,7 +132,10 @@ export function GroveDetailView({ groveId, onBack, postMessage }: GroveDetailVie
       {grove.state === 'FLOURISHING' && (
         <div className="detail-section">
           <h3>Actions</h3>
-          <button className="btn" onClick={handleStop}>Stop Grove</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={() => postMessage('connectGrove', { id: groveId })}>Connect</button>
+            <button className="btn" onClick={handleStop}>Stop Grove</button>
+          </div>
         </div>
       )}
 

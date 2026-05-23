@@ -67,6 +67,10 @@ export function App(): React.ReactElement {
         } else {
           setState((prev) => ({ ...prev, loading: false, error: msg.error }));
         }
+      } else if (msg.type === 'navigateToGrove') {
+        const groveId = (msg.data as { groveId: string }).groveId;
+        setState((prev) => ({ ...prev, view: 'detail', selectedGroveId: groveId }));
+        window.location.hash = `#/grove/${groveId}`;
       }
     };
     window.addEventListener('message', handler);

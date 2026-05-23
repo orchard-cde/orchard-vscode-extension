@@ -6,6 +6,7 @@ interface GroveCardProps {
   grove: GroveResponse;
   onNavigate: (id: string) => void;
   onDelete: (id: string, name: string) => void;
+  onConnect?: (id: string) => void;
 }
 
 function shortRepoName(repoUrl: string): string {
@@ -22,7 +23,7 @@ function formatDate(dateStr: string | null): string {
   } catch { return dateStr; }
 }
 
-export function GroveCard({ grove, onNavigate, onDelete }: GroveCardProps): React.ReactElement {
+export function GroveCard({ grove, onNavigate, onDelete, onConnect }: GroveCardProps): React.ReactElement {
   return (
     <div className="card" onClick={() => onNavigate(grove.id)}>
       <div className="card-header">
@@ -33,6 +34,9 @@ export function GroveCard({ grove, onNavigate, onDelete }: GroveCardProps): Reac
       <div className="card-accessed">Last accessed: {formatDate(grove.lastAccessedAt)}</div>
       <div className="card-actions" onClick={(e) => e.stopPropagation()}>
         <button className="btn" onClick={() => onNavigate(grove.id)}>Open</button>
+        {grove.state === 'FLOURISHING' && onConnect && (
+          <button className="btn" onClick={() => onConnect(grove.id)}>Connect</button>
+        )}
         <button className="btn btn-danger" onClick={() => onDelete(grove.id, grove.name)}>Delete</button>
       </div>
     </div>

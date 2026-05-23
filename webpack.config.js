@@ -58,6 +58,7 @@ const webviewConfig = {
   plugins: [
     new HtmlWebpackPlugin({
       filename: 'index.html',
+      template: './src/webview/index.html',
       title: 'Orchard',
     }),
   ],
