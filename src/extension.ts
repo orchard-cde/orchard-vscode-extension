@@ -9,6 +9,7 @@ import {
   CMD_GROVE_REFRESH,
   CMD_GROVE_COPY_ID,
   CMD_GROVE_SHOW_DETAILS,
+  CMD_SHOW_DASHBOARD,
   CONFIG_SERVER_URL,
   CONFIG_CULTIVATOR_ID,
 } from './constants';
@@ -16,6 +17,7 @@ import { HeaderAuthProvider } from './api/auth/headerAuthProvider';
 import { TrellisClient } from './api/trellisClient';
 import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
+import { OrchardWebviewProvider } from './views/orchardWebviewProvider';
 import { GroveTreeItem } from './views/groveTreeItem';
 import { getServerUrl, getSseEnabled } from './util/configuration';
 import { SseManager } from './services/sseManager';
@@ -35,9 +37,10 @@ let trellisClient: TrellisClient | undefined;
 let sseManager: SseManager | undefined;
 let groveManager: GroveManager | undefined;
 let treeDataProvider: GroveTreeDataProvider | undefined;
+let webviewProvider: OrchardWebviewProvider | undefined;
 let groveTreeView: vscode.TreeView<unknown> | undefined;
 
-function initializeServices(serverUrl: string): void {
+function initializeServices(context: vscode.ExtensionContext, serverUrl: string): void {
   // Dispose previous instances
   authProvider?.dispose();
   sseManager?.dispose();
@@ -55,6 +58,7 @@ function initializeServices(serverUrl: string): void {
 
   groveManager = new GroveManager(trellisClient, sseManager);
   treeDataProvider = new GroveTreeDataProvider(groveManager);
+  webviewProvider = new OrchardWebviewProvider(context, trellisClient, groveManager, sseManager);
 }
 
 function createTreeView(
@@ -85,7 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initialize services if configured
   if (serverUrl) {
-    initializeServices(serverUrl);
+    initializeServices(context, serverUrl);
     logger.info(`Orchard initialized with server: ${serverUrl}`);
   }
 
@@ -168,6 +172,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
+  registerCommand(context, CMD_SHOW_DASHBOARD, () => {
+    webviewProvider?.show();
+  });
+
   // Listen for configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -176,7 +184,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.executeCommand('setContext', 'orchard.configured', !!newServerUrl);
 
         if (newServerUrl) {
-          initializeServices(newServerUrl);
+          initializeServices(context, newServerUrl);
           createTreeView(context, treeDataProvider!);
 
           groveManager!.startPolling();
@@ -204,6 +212,13 @@ export function activate(context: vscode.ExtensionContext): void {
       if (action === 'Open Settings') {
         vscode.commands.executeCommand('workbench.action.openSettings', 'orchard.serverUrl');
       }
+    });
+  }
+
+  const wp = webviewProvider;
+  if (wp && groveManager) {
+    groveManager.onDidChangeGroves(() => {
+      wp.notifyGroveListChanged();
     });
   }
 
