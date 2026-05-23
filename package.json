@@ -178,6 +178,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
@@ -192,6 +194,8 @@
     "webpack-cli": "^5.1.0"
   },
   "dependencies": {
-    "eventsource": "^2.0.2"
+    "eventsource": "^2.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   }
 }
