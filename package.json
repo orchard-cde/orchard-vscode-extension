@@ -83,6 +83,11 @@
       {
         "command": "orchard.grove.showDetails",
         "title": "Show Grove Details"
+      },
+      {
+        "command": "orchard.showDashboard",
+        "title": "Orchard: Show Dashboard",
+        "icon": "$(dashboard)"
       }
     ],
     "menus": {
@@ -94,6 +99,11 @@
         },
         {
           "command": "orchard.grove.create",
+          "when": "view == orchard.groveExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "orchard.showDashboard",
           "when": "view == orchard.groveExplorer",
           "group": "navigation"
         }

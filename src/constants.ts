@@ -1,5 +1,6 @@
 // View IDs
 export const VIEW_GROVE_EXPLORER = 'orchard.groveExplorer';
+export const VIEW_DASHBOARD = 'orchard.dashboard';
 
 // Command IDs
 export const CMD_GROVE_CREATE = 'orchard.grove.create';
@@ -10,6 +11,7 @@ export const CMD_GROVE_DELETE = 'orchard.grove.delete';
 export const CMD_GROVE_REFRESH = 'orchard.grove.refresh';
 export const CMD_GROVE_COPY_ID = 'orchard.grove.copyId';
 export const CMD_GROVE_SHOW_DETAILS = 'orchard.grove.showDetails';
+export const CMD_SHOW_DASHBOARD = 'orchard.showDashboard';
 
 // Configuration keys
 export const CONFIG_SERVER_URL = 'orchard.serverUrl';
