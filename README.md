@@ -44,3 +44,7 @@ Manage Orchard Cloud Development Environments from VS Code.
 | Refresh Groves | Manually refresh the grove list |
 | Copy Grove ID | Copy a grove's ID to the clipboard |
 | Show Grove Details | View detailed grove information |
+
+## License
+
+Orchard for VS Code is licensed under the [Apache License, Version 2.0](LICENSE). See the [NOTICE](NOTICE) file for attribution.
