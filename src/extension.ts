@@ -183,7 +183,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration(CONFIG_SERVER_URL) || e.affectsConfiguration(CONFIG_CULTIVATOR_ID)) {
         const newServerUrl = getServerUrl();
-        vscode.commands.executeCommand('setContext', 'orchard.configured', !!newServerUrl);
+        vscode.commands.executeCommand('setContext', 'orchard.configured', !!newServerUrl || mockMode);
 
         if (newServerUrl) {
           initializeServices(context, newServerUrl, mockMode);
