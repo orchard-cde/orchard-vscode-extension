@@ -15,6 +15,7 @@ import {
 } from './constants';
 import { HeaderAuthProvider } from './api/auth/headerAuthProvider';
 import { TrellisClient, ITrellisClient } from './api/trellisClient';
+import { MockTrellisClient } from './mock/mockTrellisClient';
 import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
 import { OrchardWebviewProvider } from './views/orchardWebviewProvider';
@@ -39,7 +40,7 @@ let treeDataProvider: GroveTreeDataProvider | undefined;
 let webviewProvider: OrchardWebviewProvider | undefined;
 let groveTreeView: vscode.TreeView<unknown> | undefined;
 
-function initializeServices(context: vscode.ExtensionContext, serverUrl: string): void {
+function initializeServices(context: vscode.ExtensionContext, serverUrl: string, mockMode: boolean): void {
   // Dispose previous instances
   authProvider?.dispose();
   sseManager?.dispose();
@@ -47,9 +48,9 @@ function initializeServices(context: vscode.ExtensionContext, serverUrl: string)
   treeDataProvider?.dispose();
 
   authProvider = new HeaderAuthProvider();
-  trellisClient = new TrellisClient(serverUrl, authProvider);
+  trellisClient = mockMode ? new MockTrellisClient() : new TrellisClient(serverUrl, authProvider);
 
-  if (getSseEnabled()) {
+  if (!mockMode && getSseEnabled()) {
     sseManager = new SseManager(serverUrl, authProvider);
   } else {
     sseManager = undefined;
@@ -81,15 +82,20 @@ function registerCommand(
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  const mockMode = process.env.ORCHARD_MOCK === '1';
   const serverUrl = getServerUrl();
 
   // Set configured context for when-clauses in package.json
-  vscode.commands.executeCommand('setContext', 'orchard.configured', !!serverUrl);
+  vscode.commands.executeCommand('setContext', 'orchard.configured', !!serverUrl || mockMode);
 
-  // Initialize services if configured
-  if (serverUrl) {
-    initializeServices(context, serverUrl);
-    logger.info(`Orchard initialized with server: ${serverUrl}`);
+  // Initialize services if configured (or in mock mode)
+  if (serverUrl || mockMode) {
+    initializeServices(context, serverUrl, mockMode);
+    logger.info(
+      mockMode
+        ? 'Orchard initialized in MOCK mode (no server)'
+        : `Orchard initialized with server: ${serverUrl}`,
+    );
   }
 
   // Create and register status bar item
@@ -180,7 +186,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.executeCommand('setContext', 'orchard.configured', !!newServerUrl);
 
         if (newServerUrl) {
-          initializeServices(context, newServerUrl);
+          initializeServices(context, newServerUrl, mockMode);
           createTreeView(context, treeDataProvider!);
 
           groveManager!.startPolling();
