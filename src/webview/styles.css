@@ -1,3 +1,5 @@
+@import './design/tokens.css';
+
 :root {
   --color-primary: var(--vscode-textLink-foreground, #3794ff);
   --color-error: var(--vscode-errorForeground, #f48771);
