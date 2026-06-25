@@ -97,18 +97,24 @@ body {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
+/*
+ * button.md specs orchard-600 TEXT for secondary/ghost, but that is for
+ * light web surfaces. The webview must stay legible across editor themes, so
+ * text stays theme-adaptive (--color-fg); secondary keeps the orchard-green
+ * BORDER as the brand accent, and hover uses the editor's list-hover color.
+ */
 .btn--secondary {
   background: transparent;
   border-color: var(--color-orchard-600);
-  color: var(--color-orchard-600);
+  color: var(--color-fg);
 }
-.btn--secondary:hover:not(:disabled) { background: var(--color-orchard-50); }
+.btn--secondary:hover:not(:disabled) { background: var(--vscode-list-hoverBackground, #2a2d2e); }
 .btn--ghost {
   background: transparent;
   border-color: transparent;
-  color: var(--color-orchard-600);
+  color: var(--color-fg);
 }
-.btn--ghost:hover:not(:disabled) { background: var(--color-orchard-50); }
+.btn--ghost:hover:not(:disabled) { background: var(--vscode-list-hoverBackground, #2a2d2e); }
 .btn--danger {
   background: var(--color-error);
   border-color: var(--color-error);
@@ -133,6 +139,9 @@ body {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* Spin an inline icon (e.g. the refresh glyph) in place, without disabling the button. */
+.icon-spin { animation: spin 0.8s linear infinite; }
 
 /* Loading & Empty & Error states */
 .loading-state, .empty-state, .error-state {

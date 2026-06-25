@@ -24,7 +24,7 @@ export function Button({
   const classes = ['btn', `btn--${variant}`, `btn--${size}`];
   if (className) { classes.push(className); }
   return (
-    <button className={classes.join(' ')} disabled={disabled || loading} {...rest}>
+    <button className={classes.join(' ')} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
       {loading && <span className="btn__spinner" aria-hidden="true" />}
       {children}
     </button>

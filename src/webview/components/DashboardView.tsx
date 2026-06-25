@@ -57,7 +57,7 @@ export function DashboardView({ groves, loading, error, onNavigate, onRefresh, p
           Orchard
         </h1>
         <div className="header-actions">
-          <Button variant="secondary" size="sm" onClick={onRefresh} loading={loading}><RotateCw size={14} /> Refresh</Button>
+          <Button variant="secondary" size="sm" onClick={onRefresh}><RotateCw size={14} className={loading ? 'icon-spin' : undefined} /> Refresh</Button>
           <Button variant="primary" size="sm" onClick={() => setShowPlantModal(true)}><Plus size={14} /> Plant Grove</Button>
         </div>
       </div>
