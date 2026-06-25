@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Copy, Check } from 'lucide-react';
+import { Button } from './common/Button';
 
 interface SshConfigBlockProps {
   config: string;
@@ -20,9 +22,9 @@ export function SshConfigBlock({ config }: SshConfigBlockProps): React.ReactElem
   return (
     <div className="ssh-config">
       <pre>{config}</pre>
-      <button className="btn" onClick={handleCopy}>
-        {copied ? '✓ Copied' : 'Copy SSH Config'}
-      </button>
+      <Button variant="secondary" size="sm" onClick={handleCopy}>
+        {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy SSH Config</>}
+      </Button>
     </div>
   );
 }

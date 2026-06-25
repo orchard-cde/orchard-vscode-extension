@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import type { GroveResponse } from '../../api/types';
 import type { WebviewResponse, SseEvent } from '../types';
 import { StatusChip } from './StatusChip';
 import { GroveStateStepper } from './GroveStateStepper';
 import { SshConfigBlock } from './SshConfigBlock';
+import { Button } from './common/Button';
 
 interface GroveDetailViewProps {
   groveId: string;
@@ -91,7 +93,7 @@ export function GroveDetailView({ groveId, onBack, postMessage }: GroveDetailVie
     return (
       <div className="error-state">
         <p>⚠ {error || 'Grove not found'}</p>
-        <button className="btn" onClick={onBack}>← Back to Groves</button>
+        <button className="back-btn" onClick={onBack}><ArrowLeft size={14} /> Back to Groves</button>
       </div>
     );
   }
@@ -99,7 +101,7 @@ export function GroveDetailView({ groveId, onBack, postMessage }: GroveDetailVie
   return (
     <>
       <div className="detail-header">
-        <button className="back-btn" onClick={onBack}>← Back to Groves</button>
+        <button className="back-btn" onClick={onBack}><ArrowLeft size={14} /> Back to Groves</button>
       </div>
 
       <div className="detail-header">
@@ -133,8 +135,8 @@ export function GroveDetailView({ groveId, onBack, postMessage }: GroveDetailVie
         <div className="detail-section">
           <h3>Actions</h3>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={() => postMessage('connectGrove', { id: groveId })}>Connect</button>
-            <button className="btn" onClick={handleStop}>Stop Grove</button>
+            <Button variant="secondary" size="sm" onClick={() => postMessage('connectGrove', { id: groveId })}>Connect</Button>
+            <Button variant="secondary" size="sm" onClick={handleStop}>Stop Grove</Button>
           </div>
         </div>
       )}
@@ -142,7 +144,7 @@ export function GroveDetailView({ groveId, onBack, postMessage }: GroveDetailVie
       {grove.state === 'DORMANT' && (
         <div className="detail-section">
           <h3>Actions</h3>
-          <button className="btn" onClick={handleStart}>Start Grove</button>
+          <Button variant="secondary" size="sm" onClick={handleStart}>Start Grove</Button>
         </div>
       )}
 

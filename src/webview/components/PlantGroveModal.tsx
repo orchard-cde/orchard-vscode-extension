@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from './common/Button';
 
 interface PlantGroveModalProps {
   onClose: () => void;
@@ -86,8 +87,8 @@ export function PlantGroveModal({ onClose, onCreated, postMessage }: PlantGroveM
           </div>
           {error && <p style={{ color: 'var(--color-error)', fontSize: 12, marginBottom: 8 }}>{error}</p>}
           <div className="modal-actions">
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Plant Grove</button>
+            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="sm" type="submit">Plant Grove</Button>
           </div>
         </form>
       </div>
