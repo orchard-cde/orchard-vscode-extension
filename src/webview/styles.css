@@ -1,7 +1,11 @@
+@import './design/tokens.css';
+
 :root {
-  --color-primary: var(--vscode-textLink-foreground, #3794ff);
+  /* Brand: orchard green is the default; the editor theme overrides when it defines a button color. */
+  --color-primary: var(--vscode-button-background, var(--color-orchard-600));
+  --color-primary-hover: var(--vscode-button-hoverBackground, var(--color-orchard-700));
   --color-error: var(--vscode-errorForeground, #f48771);
-  --color-success: #4caf50;
+  --color-success: var(--color-orchard-600);
   --color-warning: #ff9800;
   --color-bg: var(--vscode-editor-background, #1e1e1e);
   --color-fg: var(--vscode-editor-foreground, #cccccc);
@@ -9,15 +13,20 @@
   --color-card-bg: var(--vscode-editor-inactiveSelectionBackground, #3a3d41);
   --color-muted: var(--vscode-descriptionForeground, #9d9d9d);
   --color-chip-prepare: #1976d2;
-  --color-chip-flourish: #2e7d32;
+  --color-chip-flourish: var(--color-orchard-600);
   --color-chip-dormant: #f57c00;
   --color-chip-blight: #d32f2f;
   --color-chip-cleared: #757575;
-  --radius: 6px;
+  /* --radius is provided by design/tokens.css (8px); not redefined here. */
   --spacing: 16px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Anchor the rem base to the webview's 13px scale so the design system's
+   rem-based --font-size-* tokens (used by buttons) line up with the UI rather
+   than resolving against the browser default ~16px root. */
+html { font-size: 13px; }
 
 body {
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
@@ -47,9 +56,13 @@ body {
 .header h1 {
   font-size: 20px;
   font-weight: 600;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.header-icon {
+  flex-shrink: 0;
 }
 
 .header-actions {
@@ -57,40 +70,92 @@ body {
   gap: 8px;
 }
 
-/* Buttons */
+/* Button — implements @orchard-cde/design components/button.md */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
   color: var(--color-fg);
-  font-size: 12px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s;
+  font-weight: 500;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.btn:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
-.btn-primary {
+/* Sizes — heights from spec, font sizes from type-scale tokens */
+.btn--sm { height: 32px; padding: 0 12px; font-size: var(--font-size-sm); }
+.btn--md { height: 40px; padding: 0 16px; font-size: var(--font-size-base); }
+.btn--lg { height: 48px; padding: 0 20px; font-size: var(--font-size-lg); }
+
+/* Variants */
+.btn--primary {
   background: var(--color-primary);
-  color: #fff;
   border-color: var(--color-primary);
+  color: #fff;
 }
-.btn-primary:hover { opacity: 0.9; }
-.btn-danger { color: var(--color-error); }
-.btn-danger:hover { background: rgba(244, 135, 113, 0.1); }
-.btn-icon {
-  padding: 4px 8px;
-  border: none;
+.btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+/*
+ * button.md specs orchard-600 TEXT for secondary/ghost, but that is for
+ * light web surfaces. The webview must stay legible across editor themes, so
+ * text stays theme-adaptive (--color-fg); secondary keeps the orchard-green
+ * BORDER as the brand accent, and hover uses the editor's list-hover color.
+ */
+.btn--secondary {
   background: transparent;
+  border-color: var(--color-orchard-600);
   color: var(--color-fg);
-  cursor: pointer;
-  font-size: 16px;
 }
-.btn-icon:hover { color: var(--color-primary); }
+.btn--secondary:hover:not(:disabled) { background: var(--vscode-list-hoverBackground, #2a2d2e); }
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-fg);
+}
+.btn--ghost:hover:not(:disabled) { background: var(--vscode-list-hoverBackground, #2a2d2e); }
+/*
+ * --color-error is a VS Code *foreground* token (salmon fallback) — using it as
+ * a fill gives white-on-light on some themes. Fill with the solid blight red,
+ * which is guaranteed to contrast with white text, until a semantic `error`
+ * token is defined in the design system.
+ */
+.btn--danger {
+  background: var(--color-chip-blight);
+  border-color: var(--color-chip-blight);
+  color: #fff;
+}
+.btn--danger:hover:not(:disabled) { opacity: 0.9; }
+
+/* States */
+.btn:focus-visible {
+  /* Transparent outline stays invisible normally but is rendered by the OS in
+     forced-colors / high-contrast mode, where box-shadow rings are stripped. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-orchard-400);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Loading spinner */
+.btn__spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Spin an inline icon (e.g. the refresh glyph) in place, without disabling the button. */
+.icon-spin { animation: spin 0.8s linear infinite; }
 
 /* Loading & Empty & Error states */
 .loading-state, .empty-state, .error-state {
@@ -212,7 +277,9 @@ body {
 .back-btn {
   background: none;
   border: none;
-  color: var(--color-primary);
+  /* Link-style text: use the editor's link foreground (guaranteed legible),
+     not --color-primary, which is a button *fill* color. */
+  color: var(--vscode-textLink-foreground, var(--color-orchard-600));
   cursor: pointer;
   font-size: 14px;
   font-family: inherit;

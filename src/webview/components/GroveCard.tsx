@@ -1,6 +1,7 @@
 import React from 'react';
 import type { GroveResponse } from '../../api/types';
 import { StatusChip } from './StatusChip';
+import { Button } from './common/Button';
 
 interface GroveCardProps {
   grove: GroveResponse;
@@ -33,11 +34,11 @@ export function GroveCard({ grove, onNavigate, onDelete, onConnect }: GroveCardP
       <div className="card-repo">{shortRepoName(grove.repositoryUrl)} ({grove.branch})</div>
       <div className="card-accessed">Last accessed: {formatDate(grove.lastAccessedAt)}</div>
       <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-        <button className="btn" onClick={() => onNavigate(grove.id)}>Open</button>
+        <Button variant="secondary" size="sm" onClick={() => onNavigate(grove.id)}>Open</Button>
         {grove.state === 'FLOURISHING' && onConnect && (
-          <button className="btn" onClick={() => onConnect(grove.id)}>Connect</button>
+          <Button variant="secondary" size="sm" onClick={() => onConnect(grove.id)}>Connect</Button>
         )}
-        <button className="btn btn-danger" onClick={() => onDelete(grove.id, grove.name)}>Delete</button>
+        <Button variant="danger" size="sm" onClick={() => onDelete(grove.id, grove.name)}>Delete</Button>
       </div>
     </div>
   );

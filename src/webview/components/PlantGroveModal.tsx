@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from './common/Button';
 
 interface PlantGroveModalProps {
   onClose: () => void;
@@ -18,15 +19,18 @@ export function PlantGroveModal({ onClose, onCreated, postMessage }: PlantGroveM
   const [name, setName] = useState('');
   const [machineSize, setMachineSize] = useState('small');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) { return; }
     if (!repoUrl.trim()) { setError('Repository URL is required'); return; }
 
     const handler = (event: MessageEvent) => {
       const msg = event.data;
       if (msg.type === 'createGrove') {
         window.removeEventListener('message', handler);
+        setSubmitting(false);
         if (msg.success) {
           onCreated();
         } else {
@@ -35,6 +39,7 @@ export function PlantGroveModal({ onClose, onCreated, postMessage }: PlantGroveM
       }
     };
 
+    setSubmitting(true);
     window.addEventListener('message', handler);
     postMessage('createGrove', {
       repositoryUrl: repoUrl.trim(),
@@ -86,8 +91,8 @@ export function PlantGroveModal({ onClose, onCreated, postMessage }: PlantGroveM
           </div>
           {error && <p style={{ color: 'var(--color-error)', fontSize: 12, marginBottom: 8 }}>{error}</p>}
           <div className="modal-actions">
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Plant Grove</button>
+            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="sm" type="submit" loading={submitting}>Plant Grove</Button>
           </div>
         </form>
       </div>

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { TrellisClient } from '../api/trellisClient';
+import { ITrellisClient } from '../api/trellisClient';
 import { CreateGroveRequest, GroveResponse } from '../api/types';
 import { getAutoRefreshInterval } from '../util/configuration';
 import { SseManager } from './sseManager';
@@ -15,7 +15,7 @@ export class GroveManager implements vscode.Disposable {
   readonly onDidChangeGroves: vscode.Event<void> = this._onDidChangeGroves.event;
 
   constructor(
-    private readonly trellisClient: TrellisClient,
+    private readonly trellisClient: ITrellisClient,
     private readonly sseManager?: SseManager,
   ) {
     if (this.sseManager) {
