@@ -1,9 +1,11 @@
 @import './design/tokens.css';
 
 :root {
-  --color-primary: var(--vscode-textLink-foreground, #3794ff);
+  /* Brand: orchard green is the default; the editor theme overrides when it defines a button color. */
+  --color-primary: var(--vscode-button-background, var(--color-orchard-600));
+  --color-primary-hover: var(--vscode-button-hoverBackground, var(--color-orchard-700));
   --color-error: var(--vscode-errorForeground, #f48771);
-  --color-success: #4caf50;
+  --color-success: var(--color-orchard-600);
   --color-warning: #ff9800;
   --color-bg: var(--vscode-editor-background, #1e1e1e);
   --color-fg: var(--vscode-editor-foreground, #cccccc);
@@ -11,11 +13,11 @@
   --color-card-bg: var(--vscode-editor-inactiveSelectionBackground, #3a3d41);
   --color-muted: var(--vscode-descriptionForeground, #9d9d9d);
   --color-chip-prepare: #1976d2;
-  --color-chip-flourish: #2e7d32;
+  --color-chip-flourish: var(--color-orchard-600);
   --color-chip-dormant: #f57c00;
   --color-chip-blight: #d32f2f;
   --color-chip-cleared: #757575;
-  --radius: 6px;
+  /* --radius is provided by design/tokens.css (8px); not redefined here. */
   --spacing: 16px;
 }
 
@@ -81,7 +83,7 @@ body {
   color: #fff;
   border-color: var(--color-primary);
 }
-.btn-primary:hover { opacity: 0.9; }
+.btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
 .btn-danger { color: var(--color-error); }
 .btn-danger:hover { background: rgba(244, 135, 113, 0.1); }
 .btn-icon {
