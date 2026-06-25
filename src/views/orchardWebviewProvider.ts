@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { TrellisClient } from '../api/trellisClient';
+import { ITrellisClient } from '../api/trellisClient';
 import { GroveManager } from '../services/groveManager';
 import { SseManager } from '../services/sseManager';
 import * as logger from '../util/logger';
@@ -14,7 +14,7 @@ export class OrchardWebviewProvider implements vscode.Disposable {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly trellisClient: TrellisClient,
+    private readonly trellisClient: ITrellisClient,
     private readonly groveManager: GroveManager,
     private readonly sseManager?: SseManager,
   ) {}

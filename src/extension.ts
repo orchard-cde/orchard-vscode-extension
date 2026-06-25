@@ -14,7 +14,7 @@ import {
   CONFIG_CULTIVATOR_ID,
 } from './constants';
 import { HeaderAuthProvider } from './api/auth/headerAuthProvider';
-import { TrellisClient } from './api/trellisClient';
+import { TrellisClient, ITrellisClient } from './api/trellisClient';
 import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
 import { OrchardWebviewProvider } from './views/orchardWebviewProvider';
@@ -32,7 +32,7 @@ import { refreshGroves } from './commands/refreshGroves';
 import { TrowelService } from './services/trowelService';
 
 let authProvider: HeaderAuthProvider | undefined;
-let trellisClient: TrellisClient | undefined;
+let trellisClient: ITrellisClient | undefined;
 let sseManager: SseManager | undefined;
 let groveManager: GroveManager | undefined;
 let treeDataProvider: GroveTreeDataProvider | undefined;

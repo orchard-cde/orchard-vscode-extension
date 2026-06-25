@@ -8,7 +8,20 @@ import {
   TrellisApiError,
 } from './types';
 
-export class TrellisClient {
+export interface ITrellisClient {
+  getMe(): Promise<CultivatorResponse>;
+  listGroves(): Promise<GroveResponse[]>;
+  getGrove(id: string): Promise<GroveResponse>;
+  createGrove(request: CreateGroveRequest): Promise<GroveResponse>;
+  deleteGrove(id: string): Promise<void>;
+  stopGrove(id: string): Promise<GroveResponse>;
+  startGrove(id: string): Promise<GroveResponse>;
+  getSshConfig(id: string): Promise<string>;
+  getHealth(): Promise<HealthResponse>;
+  getReadiness(): Promise<ReadinessResponse>;
+}
+
+export class TrellisClient implements ITrellisClient {
   constructor(
     private readonly baseUrl: string,
     private readonly authProvider: AuthProvider,

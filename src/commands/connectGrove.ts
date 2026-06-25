@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { GroveResponse } from '../api/types';
-import { TrellisClient } from '../api/trellisClient';
+import { ITrellisClient } from '../api/trellisClient';
 import * as logger from '../util/logger';
 
 function isWsl(): boolean {
@@ -147,7 +147,7 @@ async function writeSshConfig(
   }
 }
 
-export async function connectGrove(grove: GroveResponse, trellisClient: TrellisClient): Promise<void> {
+export async function connectGrove(grove: GroveResponse, trellisClient: ITrellisClient): Promise<void> {
   try {
     // Fetch SSH config from the API
     const sshConfig = await trellisClient.getSshConfig(grove.id);
