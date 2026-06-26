@@ -1,5 +1,7 @@
 # Orchard for VS Code
 
+[![GitLab mirror](https://img.shields.io/badge/mirror-gitlab.com%2Forchard--cde-FC6D26?logo=gitlab)](https://gitlab.com/orchard-cde/orchard-vscode-extension)
+
 Manage Orchard Cloud Development Environments from VS Code.
 
 ## Features
