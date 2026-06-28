@@ -15,5 +15,5 @@ jobs:
 
       - name: Push to GitLab
         run: |
-          git remote add gitlab "https://\${{ secrets.GITLAB_MIRROR_USER }}:\${{ secrets.GITLAB_MIRROR_TOKEN }}@gitlab.com/orchard-cde/orchard-vscode-extension.git"
+          git remote add gitlab "https://${{ secrets.GITLAB_MIRROR_USER }}:${{ secrets.GITLAB_MIRROR_TOKEN }}@gitlab.com/orchard-cde/orchard-vscode-extension.git"
           git push gitlab HEAD:main
