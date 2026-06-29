@@ -1,4 +1,4 @@
-@import './design/tokens.css';
+@import '@orchard-cde/design/dist/tokens.css';
 
 :root {
   /* Brand: orchard green is the default; the editor theme overrides when it defines a button color. */
