@@ -192,7 +192,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/react": "^19.2.15",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
@@ -211,7 +211,7 @@
     "@orchard-cde/design": "https://github.com/orchard-cde/design/archive/refs/tags/v0.1.0.tar.gz",
     "eventsource": "^2.0.2",
     "lucide-react": "^1.21.0",
-    "react": "^19.2.6",
+    "react": "^19.2.7",
     "react-dom": "^19.2.6"
   }
 }
