@@ -209,7 +209,7 @@
   },
   "dependencies": {
     "@orchard-cde/design": "https://github.com/orchard-cde/design/archive/refs/tags/v0.1.0.tar.gz",
-    "eventsource": "^2.0.2",
+    "eventsource": "^4.1.0",
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
