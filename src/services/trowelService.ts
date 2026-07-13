@@ -61,6 +61,24 @@ export class TrowelService {
   }
 
   /**
+   * Runs `{trowelPath} --version` and parses the semver version string.
+   * Returns the version (e.g. "0.3.0") or undefined if unavailable.
+   */
+  async getLocalVersion(trowelPath: string): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      cp.execFile(trowelPath, ['--version'], (error, stdout) => {
+        if (error || !stdout.trim()) {
+          resolve(undefined);
+          return;
+        }
+        // Match semver pattern: X.Y.Z (optional pre-release/build metadata)
+        const match = stdout.trim().match(/(\d+\.\d+\.\d+(?:[-+].+)?)/);
+        resolve(match ? match[1] : undefined);
+      });
+    });
+  }
+
+  /**
    * Checks for the Trowel CLI and shows an informational message if it is not installed.
    */
   async promptInstallIfMissing(): Promise<void> {
@@ -75,7 +93,7 @@ export class TrowelService {
     );
 
     if (action === 'Learn More') {
-      vscode.env.openExternal(vscode.Uri.parse('https://github.com/orchard-cde/trowel'));
+      vscode.env.openExternal(vscode.Uri.parse('https://github.com/orchard-cde/orchard'));
     }
   }
 
