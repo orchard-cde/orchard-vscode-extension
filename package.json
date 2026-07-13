@@ -178,6 +178,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable Server-Sent Events for real-time grove status updates"
+        },
+        "orchard.trowelAutoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically download Trowel CLI updates on extension startup"
         }
       }
     }
