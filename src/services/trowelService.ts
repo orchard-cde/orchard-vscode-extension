@@ -16,8 +16,8 @@ export class TrowelService {
   /**
    * Finds the Trowel CLI binary by checking:
    * 1. The orchard.trowelPath setting
-   * 2. The system PATH via `which trowel`
-   * 3. VS Code globalStoragePath (auto-updated location)
+   * 2. VS Code globalStoragePath (auto-updated location)
+   * 3. The system PATH via `which trowel`
    * 4. ~/.orchard/bin/trowel
    *
    * Returns the path if found, undefined if not.
@@ -33,20 +33,20 @@ export class TrowelService {
       logger.warn(`Configured trowelPath does not exist: ${configuredPath}`);
     }
 
-    // 2. Try `which trowel` on the system PATH
-    const whichPath = await this.whichTrowel();
-    if (whichPath) {
-      logger.info(`Trowel CLI found on PATH: ${whichPath}`);
-      return whichPath;
-    }
-
-    // 3. Check VS Code globalStorage
+    // 2. Check VS Code globalStorage (auto-updated location takes precedence over PATH)
     if (this.globalStoragePath) {
       const storagePath = path.join(this.globalStoragePath, 'bin', 'trowel');
       if (fs.existsSync(storagePath)) {
         logger.info(`Trowel CLI found at globalStorage path: ${storagePath}`);
         return storagePath;
       }
+    }
+
+    // 3. Try `which trowel` on the system PATH
+    const whichPath = await this.whichTrowel();
+    if (whichPath) {
+      logger.info(`Trowel CLI found on PATH: ${whichPath}`);
+      return whichPath;
     }
 
     // 4. Check ~/.orchard/bin/trowel
