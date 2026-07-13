@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as https from 'https';
+
 import * as crypto from 'crypto';
 import { execFile } from 'child_process';
 import { getTrowelAutoUpdate, getTrowelPath } from '../util/configuration';
@@ -287,48 +287,24 @@ export class TrowelUpdater {
     return va.patch - vb.patch;
   }
 
-  private httpGet<T>(url: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      https
-        .get(url, { headers: { 'User-Agent': 'orchard-vscode-extension' } }, (res) => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
-          res.on('end', () => {
-            try {
-              resolve(JSON.parse(data));
-            } catch (err) {
-              reject(err);
-            }
-          });
-        })
-        .on('error', reject);
+  private async httpGet<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'orchard-vscode-extension' },
     });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json() as Promise<T>;
   }
 
-  private httpDownload(url: string, destPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      https
-        .get(url, { headers: { 'User-Agent': 'orchard-vscode-extension' } }, (res) => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
-          const file = fs.createWriteStream(destPath);
-          res.pipe(file);
-          file.on('finish', () => {
-            file.close();
-            resolve();
-          });
-          file.on('error', (err) => {
-            fs.unlinkSync(destPath);
-            reject(err);
-          });
-        })
-        .on('error', reject);
+  private async httpDownload(url: string, destPath: string): Promise<void> {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'orchard-vscode-extension' },
     });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(destPath, buffer);
   }
 }
