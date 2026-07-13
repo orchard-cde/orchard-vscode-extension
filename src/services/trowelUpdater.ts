@@ -181,7 +181,7 @@ export class TrowelUpdater {
 
       // Parse checksum file (format: "hash  filename")
       const lines = checksumContent.split('\n');
-      const expectedLine = lines.find((l) => l.includes(assetName));
+      const expectedLine = lines.find((l: string) => l.includes(assetName));
       if (!expectedLine) {
         logger.warn(`No checksum found for ${assetName}`);
         return false;
@@ -207,7 +207,7 @@ export class TrowelUpdater {
 
       // Extract tarball
       await new Promise<void>((resolve, reject) => {
-        execFile('tar', ['xzf', tarballPath, '-C', tmpExtract], (error) => {
+        execFile('tar', ['xzf', tarballPath, '-C', tmpExtract], (error: Error | null) => {
           if (error) {
             reject(error);
           } else {
