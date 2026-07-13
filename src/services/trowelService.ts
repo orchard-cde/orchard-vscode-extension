@@ -7,11 +7,18 @@ import { getTrowelPath } from '../util/configuration';
 import * as logger from '../util/logger';
 
 export class TrowelService {
+  private globalStoragePath: string | undefined;
+
+  constructor(globalStoragePath?: string) {
+    this.globalStoragePath = globalStoragePath;
+  }
+
   /**
    * Finds the Trowel CLI binary by checking:
    * 1. The orchard.trowelPath setting
    * 2. The system PATH via `which trowel`
-   * 3. ~/.orchard/bin/trowel
+   * 3. VS Code globalStoragePath (auto-updated location)
+   * 4. ~/.orchard/bin/trowel
    *
    * Returns the path if found, undefined if not.
    */
@@ -33,7 +40,16 @@ export class TrowelService {
       return whichPath;
     }
 
-    // 3. Check ~/.orchard/bin/trowel
+    // 3. Check VS Code globalStorage
+    if (this.globalStoragePath) {
+      const storagePath = path.join(this.globalStoragePath, 'bin', 'trowel');
+      if (fs.existsSync(storagePath)) {
+        logger.info(`Trowel CLI found at globalStorage path: ${storagePath}`);
+        return storagePath;
+      }
+    }
+
+    // 4. Check ~/.orchard/bin/trowel
     const defaultPath = path.join(os.homedir(), '.orchard', 'bin', 'trowel');
     if (fs.existsSync(defaultPath)) {
       logger.info(`Trowel CLI found at default path: ${defaultPath}`);
