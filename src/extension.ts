@@ -31,6 +31,7 @@ import { stopGrove } from './commands/stopGrove';
 import { startGrove } from './commands/startGrove';
 import { refreshGroves } from './commands/refreshGroves';
 import { TrowelService } from './services/trowelService';
+import { TrowelUpdater } from './services/trowelUpdater';
 
 let authProvider: HeaderAuthProvider | undefined;
 let trellisClient: ITrellisClient | undefined;
@@ -224,10 +225,16 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   }
 
-  // Check for Trowel CLI (non-blocking)
-  const trowelService = new TrowelService();
-  trowelService.promptInstallIfMissing().catch((err) => {
-    logger.warn(`Trowel detection failed: ${err}`);
+  // Auto-update Trowel CLI, then fall back to user-facing message if still missing
+  const trowelService = new TrowelService(context.globalStoragePath);
+  const trowelUpdater = new TrowelUpdater(context, trowelService);
+  trowelUpdater.ensureLatestTrowel().catch((err) => {
+    logger.warn(`Trowel auto-update failed: ${err}`);
+  }).finally(() => {
+    // If no binary exists after auto-update attempt, show the fallback notification
+    trowelService.promptInstallIfMissing().catch((err) => {
+      logger.warn(`Trowel fallback prompt failed: ${err}`);
+    });
   });
 
   // Push service disposables
