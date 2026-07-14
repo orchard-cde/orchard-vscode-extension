@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import { GroveResponse } from '../api/types';
 import { ITrellisClient } from '../api/trellisClient';
 import * as logger from '../util/logger';
+import { sanitizeHostName, wslPathToWin, filterSshConfigLines, buildSshConfig, writeSshConfig } from './connectGroveUtils';
 
 function isWsl(): boolean {
   return os.release().toLowerCase().includes('microsoft');
@@ -31,15 +32,20 @@ async function getWindowsTempDir(): Promise<string | undefined> {
 /** Write SSH config to Windows filesystem with correct permissions via PowerShell. */
 async function writeWindowsSshConfig(winDir: string, hostName: string, content: string): Promise<void> {
   const winTmp = (await getWindowsTempDir()) || '/tmp';
-  const tmpContent = path.join(winTmp, `orchard-ssh-${hostName}.txt`);
-  const tmpScript = path.join(winTmp, `orchard-ssh-${hostName}.ps1`);
+  const tmpContentWsl = path.join(winTmp, `orchard-ssh-${hostName}.txt`);
+  const tmpScriptWsl = path.join(winTmp, `orchard-ssh-${hostName}.ps1`);
   const hostFile = `${winDir}\\orchard_hosts\\${hostName}`;
 
-  await fs.promises.writeFile(tmpContent, content, 'utf-8');
+  // Write content to WSL-accessible path
+  await fs.promises.writeFile(tmpContentWsl, content, 'utf-8');
+
+  // Convert WSL paths to Windows paths for PowerShell
+  const tmpContentWin = wslPathToWin(tmpContentWsl);
+  const tmpScriptWin = wslPathToWin(tmpScriptWsl);
 
   const psLines = [
     `$hostFile = "${hostFile}"`,
-    `$contentFile = "${tmpContent}"`,
+    `$contentFile = "${tmpContentWin}"`,
     '$hostDir = Split-Path $hostFile -Parent',
     'if (!(Test-Path $hostDir)) { New-Item -ItemType Directory -Path $hostDir -Force | Out-Null }',
     'if (Test-Path $hostFile) { Remove-Item $hostFile -Force }',
@@ -48,12 +54,12 @@ async function writeWindowsSshConfig(winDir: string, hostName: string, content: 
     'icacls $hostFile /inheritance:r /grant ("${u}:(R)")',
     'Write-Output "OK"',
   ];
-  await fs.promises.writeFile(tmpScript, psLines.join('\n'), 'utf-8');
+  await fs.promises.writeFile(tmpScriptWsl, psLines.join('\n'), 'utf-8');
 
   try {
     await new Promise<void>((resolve, reject) => {
       exec(
-        `powershell.exe -ExecutionPolicy Bypass -File "${tmpScript}"`,
+        `powershell.exe -ExecutionPolicy Bypass -File "${tmpScriptWin}"`,
         { timeout: 30000 },
         (err, stdout, stderr) => {
           const combined = (stdout || '') + (stderr || '');
@@ -67,15 +73,9 @@ async function writeWindowsSshConfig(winDir: string, hostName: string, content: 
       );
     });
   } finally {
-    try { await fs.promises.unlink(tmpScript); } catch { /* ok */ }
-    try { await fs.promises.unlink(tmpContent); } catch { /* ok */ }
+    try { await fs.promises.unlink(tmpScriptWsl); } catch { /* ok */ }
+    try { await fs.promises.unlink(tmpContentWsl); } catch { /* ok */ }
   }
-}
-
-/** Convert a WSL /mnt path to a Windows path (e.g., /mnt/c/Users/X → C:\Users\X). */
-function wslPathToWin(wslPath: string): string {
-  const parts = wslPath.replace(/^\/mnt\//, '').split('/');
-  return parts[0].toUpperCase() + ':\\' + parts.slice(1).join('\\');
 }
 
 /** Find the Windows user's .ssh directory from WSL by scanning /mnt/c/Users/. */
@@ -118,35 +118,6 @@ function findWindowsSshDir(): string | undefined {
   return undefined;
 }
 
-function sanitizeHostName(name: string): string {
-  return 'orchard-' + name.replace(/[^a-zA-Z0-9-]/g, '-');
-}
-
-async function writeSshConfig(
-  sshDir: string,
-  hostName: string,
-  config: string,
-  includeDirective: string,
-): Promise<void> {
-  const orchardHostsDir = path.join(sshDir, 'orchard_hosts');
-  await fs.promises.mkdir(orchardHostsDir, { recursive: true });
-
-  const hostConfigPath = path.join(orchardHostsDir, hostName);
-  await fs.promises.writeFile(hostConfigPath, config, { mode: 0o600 });
-
-  const sshConfigPath = path.join(sshDir, 'config');
-  let existingConfig = '';
-  try {
-    existingConfig = await fs.promises.readFile(sshConfigPath, 'utf-8');
-  } catch {
-    // File may not exist yet
-  }
-  if (!existingConfig.includes(includeDirective)) {
-    const newConfig = includeDirective + '\n\n' + existingConfig;
-    await fs.promises.writeFile(sshConfigPath, newConfig, { mode: 0o600 });
-  }
-}
-
 export async function connectGrove(grove: GroveResponse, trellisClient: ITrellisClient): Promise<void> {
   try {
     // Fetch SSH config from the API
@@ -155,15 +126,15 @@ export async function connectGrove(grove: GroveResponse, trellisClient: ITrellis
     // Sanitize grove name for SSH host
     const hostName = sanitizeHostName(grove.name);
 
-    // Append IdentityFile if not already present
-    const identityFile = path.join(os.homedir(), '.ssh', 'orchard_ed25519');
-    const configLines = sshConfig.trim().split('\n');
-    const hasIdentityFile = configLines.some((l) => l.trim().startsWith('IdentityFile'));
-    const fullConfig = hasIdentityFile ? sshConfig : sshConfig + `\n  IdentityFile ${identityFile}`;
+    // Filter out Host and IdentityFile from the API response — we unconditionally
+    // append correct platform-specific values for both below
+    const filteredLines = filterSshConfigLines(sshConfig);
 
     const includeDirective = 'Include orchard_hosts/*';
 
-    // Write to Linux/WSL SSH config
+    // Linux/WSL config: unconditional IdentityFile with WSL path
+    const linuxIdentityFile = path.join(os.homedir(), '.ssh', 'orchard_ed25519');
+    const fullConfig = buildSshConfig(hostName, filteredLines, linuxIdentityFile);
     await writeSshConfig(path.join(os.homedir(), '.ssh'), hostName, fullConfig, includeDirective);
 
     // On WSL, also write to Windows SSH config
@@ -172,32 +143,65 @@ export async function connectGrove(grove: GroveResponse, trellisClient: ITrellis
       if (wslSshDir) {
         const winSshDir = wslPathToWin(wslSshDir);
         const winKeyPath = path.join(wslSshDir, 'orchard_ed25519');
+        const winKeyWinPath = wslPathToWin(winKeyPath);
 
-        // Copy SSH key from WSL to Windows if needed
+        // Always copy SSH key from WSL to Windows (prevents stale key issues)
         const wslKeyPath = path.join(os.homedir(), '.ssh', 'orchard_ed25519');
-        if (fs.existsSync(wslKeyPath) && !fs.existsSync(winKeyPath)) {
+        if (fs.existsSync(wslKeyPath)) {
           await fs.promises.copyFile(wslKeyPath, winKeyPath);
-          logger.info(`connectGrove: copied SSH key to Windows: ${winKeyPath}`);
+          logger.debug(`connectGrove: copied SSH key to Windows: ${winKeyPath}`);
+        } else {
+          logger.warn(`connectGrove: WSL key not found: ${wslKeyPath}`);
         }
+
         // Fix key file permissions (SSH requires strict ACLs on private keys)
         if (fs.existsSync(winKeyPath)) {
-          const winKeyWinPath = winKeyPath.replace(/\//g, '\\');
           try {
-            await new Promise<void>((resolve, reject) => {
+            const icaclsOutput = await new Promise<string>((resolve, reject) => {
               exec(
                 `icacls.exe "${winKeyWinPath}" /inheritance:r /grant "STEVEN-PC\\Steven Tompkins:(R)"`,
                 { timeout: 10000 },
-                (err) => { if (err) reject(err); else resolve(); },
+                (err, stdout, stderr) => {
+                  if (err) { reject(new Error(stderr || err.message)); } else { resolve(stdout || ''); }
+                },
               );
             });
+            logger.debug(`connectGrove: icacls OK: ${icaclsOutput.trim()}`);
           } catch (e) {
             logger.warn(`connectGrove: failed to fix key permissions: ${e}`);
           }
+        } else {
+          logger.warn(`connectGrove: SSH key does not exist on Windows: ${winKeyPath}`);
         }
 
+        // Windows config: unconditional IdentityFile with Windows path
         const winIdentityFile = `"${winSshDir}\\orchard_ed25519"`;
-        const winConfig = hasIdentityFile ? sshConfig : sshConfig + `\n  IdentityFile ${winIdentityFile}`;
+        const winConfig = buildSshConfig(hostName, filteredLines, winIdentityFile);
         await writeWindowsSshConfig(winSshDir, hostName, winConfig);
+
+        // Ensure Include directive is in Windows main SSH config
+        const winMainConfigPath = path.join(wslSshDir, 'config');
+        let winMainConfig = '';
+        try {
+          winMainConfig = await fs.promises.readFile(winMainConfigPath, 'utf-8');
+        } catch {
+          // File may not exist yet
+        }
+        logger.debug(`connectGrove WIN-SSH: main config path=${winMainConfigPath}`);
+        if (!winMainConfig.includes(includeDirective)) {
+          const newWinConfig = includeDirective + '\n\n' + winMainConfig;
+          await fs.promises.writeFile(winMainConfigPath, newWinConfig, { mode: 0o600 });
+          logger.debug(`connectGrove WIN-SSH: added Include directive`);
+        }
+        // Read back the host config file to confirm
+        const winHostConfigPath = path.join(wslSshDir, 'orchard_hosts', hostName);
+        try {
+          const written = await fs.promises.readFile(winHostConfigPath, 'utf-8');
+          logger.debug(`connectGrove WIN-SSH: host config written:\n${written}`);
+        } catch (e) {
+          logger.warn(`connectGrove WIN-SSH: could not read host config: ${e}`);
+        }
+
         logger.info(`connectGrove: wrote SSH config to Windows: ${winSshDir}`);
       } else {
         logger.warn('connectGrove: could not find Windows SSH dir to write config');
