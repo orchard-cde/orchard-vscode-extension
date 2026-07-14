@@ -186,7 +186,12 @@
         },
         "orchard.logLevel": {
           "type": "string",
-          "enum": ["debug", "info", "warn", "error"],
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
           "default": "info",
           "description": "Log level for the Orchard output channel"
         }
@@ -224,6 +229,7 @@
     "eventsource": "^4.1.0",
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "tar": "^7.5.20"
   }
 }

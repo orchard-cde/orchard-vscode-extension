@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as tar from 'tar';
 
 import * as crypto from 'crypto';
-import { execFile } from 'child_process';
 import { getTrowelAutoUpdate, getTrowelPath } from '../util/configuration';
 import { TrowelService } from './trowelService';
 import * as logger from '../util/logger';
@@ -172,12 +172,11 @@ export class TrowelUpdater {
     checksumUrl: string,
     assetName: string,
   ): Promise<boolean> {
+    const tmpChecksum = path.join(os.tmpdir(), `trowel-checksum-${Date.now()}.txt`);
     try {
-      const tmpChecksum = path.join(os.tmpdir(), `trowel-checksum-${Date.now()}.txt`);
       await this.httpDownload(checksumUrl, tmpChecksum);
 
       const checksumContent = fs.readFileSync(tmpChecksum, 'utf-8');
-      fs.unlinkSync(tmpChecksum);
 
       // Parse checksum file (format: "hash  filename")
       const lines = checksumContent.split('\n');
@@ -197,6 +196,8 @@ export class TrowelUpdater {
     } catch (err) {
       logger.warn(`Checksum verification failed: ${err}`);
       return false;
+    } finally {
+      try { fs.unlinkSync(tmpChecksum); } catch { /* already deleted */ }
     }
   }
 
@@ -205,15 +206,10 @@ export class TrowelUpdater {
     try {
       fs.mkdirSync(tmpExtract, { recursive: true });
 
-      // Extract tarball
-      await new Promise<void>((resolve, reject) => {
-        execFile('tar', ['xzf', tarballPath, '-C', tmpExtract], (error: Error | null) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
-        });
+      // Extract tarball using pure Node.js tar library
+      await tar.x({
+        file: tarballPath,
+        cwd: tmpExtract,
       });
 
       // Find the trowel binary in extracted contents (trowel on unix, trowel.exe on Windows)

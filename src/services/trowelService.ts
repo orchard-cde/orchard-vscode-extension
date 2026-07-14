@@ -66,7 +66,7 @@ export class TrowelService {
    */
   async getLocalVersion(trowelPath: string): Promise<string | undefined> {
     return new Promise((resolve) => {
-      cp.execFile(trowelPath, ['--version'], (error, stdout) => {
+      cp.execFile(trowelPath, ['--version'], { timeout: 5000 }, (error, stdout) => {
         if (error || !stdout.trim()) {
           resolve(undefined);
           return;
@@ -100,7 +100,7 @@ export class TrowelService {
   private whichTrowel(): Promise<string | undefined> {
     const command = process.platform === 'win32' ? 'where' : 'which';
     return new Promise((resolve) => {
-      cp.execFile(command, ['trowel'], (error, stdout) => {
+      cp.execFile(command, ['trowel'], { timeout: 5000 }, (error, stdout) => {
         if (error || !stdout.trim()) {
           resolve(undefined);
         } else {
