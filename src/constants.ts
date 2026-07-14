@@ -19,3 +19,5 @@ export const CONFIG_CULTIVATOR_ID = 'orchard.cultivatorId';
 export const CONFIG_TROWEL_PATH = 'orchard.trowelPath';
 export const CONFIG_AUTO_REFRESH_INTERVAL = 'orchard.autoRefreshInterval';
 export const CONFIG_SSE_ENABLED = 'orchard.sseEnabled';
+export const CONFIG_TROWEL_AUTO_UPDATE = 'orchard.trowelAutoUpdate';
+export const CONFIG_LOG_LEVEL = 'orchard.logLevel';

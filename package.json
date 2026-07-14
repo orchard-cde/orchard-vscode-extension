@@ -178,6 +178,22 @@
           "type": "boolean",
           "default": true,
           "description": "Enable Server-Sent Events for real-time grove status updates"
+        },
+        "orchard.trowelAutoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically download Trowel CLI updates on extension startup"
+        },
+        "orchard.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "description": "Log level for the Orchard output channel"
         }
       }
     }
@@ -187,7 +203,7 @@
     "compile": "webpack --mode development",
     "watch": "webpack --mode development --watch",
     "lint": "eslint src",
-    "test": "echo \"no tests yet\"",
+    "test": "vitest run",
     "package": "vsce package"
   },
   "devDependencies": {
@@ -204,6 +220,7 @@
     "style-loader": "^4.0.0",
     "ts-loader": "^9.6.2",
     "typescript": "^5.3.0",
+    "vitest": "^4.1.10",
     "webpack": "^5.108.4",
     "webpack-cli": "^7.2.1"
   },
@@ -212,6 +229,7 @@
     "eventsource": "^4.1.0",
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "tar": "^7.5.20"
   }
 }

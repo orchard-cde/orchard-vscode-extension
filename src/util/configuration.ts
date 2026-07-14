@@ -5,6 +5,8 @@ import {
   CONFIG_TROWEL_PATH,
   CONFIG_AUTO_REFRESH_INTERVAL,
   CONFIG_SSE_ENABLED,
+  CONFIG_TROWEL_AUTO_UPDATE,
+  CONFIG_LOG_LEVEL,
 } from '../constants';
 
 function getConfig(): vscode.WorkspaceConfiguration {
@@ -33,4 +35,12 @@ export function getAutoRefreshInterval(): number {
 
 export function getSseEnabled(): boolean {
   return getConfig().get<boolean>(stripPrefix(CONFIG_SSE_ENABLED), true);
+}
+
+export function getTrowelAutoUpdate(): boolean {
+  return getConfig().get<boolean>(stripPrefix(CONFIG_TROWEL_AUTO_UPDATE), true);
+}
+
+export function getLogLevel(): string {
+  return getConfig().get<string>(stripPrefix(CONFIG_LOG_LEVEL), 'info');
 }
