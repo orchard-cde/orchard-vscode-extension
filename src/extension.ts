@@ -20,10 +20,11 @@ import { GroveManager } from './services/groveManager';
 import { GroveTreeDataProvider } from './views/groveTreeDataProvider';
 import { OrchardWebviewProvider } from './views/orchardWebviewProvider';
 import { GroveTreeItem } from './views/groveTreeItem';
-import { getServerUrl, getSseEnabled } from './util/configuration';
+import { getServerUrl, getSseEnabled, getLogLevel } from './util/configuration';
 import { SseManager } from './services/sseManager';
 import { createStatusBarItem, updateStatusBar } from './views/statusBar';
 import * as logger from './util/logger';
+import { LogLevel } from './util/logger';
 import { createGrove } from './commands/createGrove';
 import { connectGrove } from './commands/connectGrove';
 import { deleteGrove } from './commands/deleteGrove';
@@ -85,6 +86,10 @@ function registerCommand(
 export function activate(context: vscode.ExtensionContext): void {
   const mockMode = process.env.ORCHARD_MOCK === '1';
   const serverUrl = getServerUrl();
+
+  // Initialize log level from configuration (env var overrides for launch configs)
+  const envLogLevel = process.env.ORCHARD_LOG_LEVEL as LogLevel | undefined;
+  logger.setLogLevel(envLogLevel || (getLogLevel() as LogLevel));
 
   // Set configured context for when-clauses in package.json
   vscode.commands.executeCommand('setContext', 'orchard.configured', !!serverUrl || mockMode);

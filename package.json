@@ -183,6 +183,12 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically download Trowel CLI updates on extension startup"
+        },
+        "orchard.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Log level for the Orchard output channel"
         }
       }
     }
@@ -192,7 +198,7 @@
     "compile": "webpack --mode development",
     "watch": "webpack --mode development --watch",
     "lint": "eslint src",
-    "test": "echo \"no tests yet\"",
+    "test": "vitest run",
     "package": "vsce package"
   },
   "devDependencies": {
@@ -209,6 +215,7 @@
     "style-loader": "^4.0.0",
     "ts-loader": "^9.6.2",
     "typescript": "^5.3.0",
+    "vitest": "^4.1.10",
     "webpack": "^5.108.4",
     "webpack-cli": "^7.2.1"
   },

@@ -5,18 +5,35 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "${defaultBuildTask}"
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "env": {
+        "ORCHARD_LOG_LEVEL": "debug"
+      },
+      "preLaunchTask": "npm: compile",
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "cascadeTerminateToConfigurations": [
+        "Attach to Webview"
+      ]
     },
     {
-      "name": "Run Extension (Mock)",
+      "name": "Run Extension (Mock Mode)",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "${defaultBuildTask}",
-      "env": { "ORCHARD_MOCK": "1" }
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "env": {
+        "ORCHARD_MOCK": "1",
+        "ORCHARD_LOG_LEVEL": "debug"
+      },
+      "preLaunchTask": "npm: compile",
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ]
     }
   ]
 }
