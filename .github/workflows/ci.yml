@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - uses: actions/setup-node@49c5eb4781f51c69518a17031d3d11ec7b8d0c0e  # v4.4.0
+      - uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
           cache: npm
