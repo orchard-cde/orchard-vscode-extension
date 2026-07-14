@@ -155,11 +155,15 @@ export async function connectGrove(grove: GroveResponse, trellisClient: ITrellis
     // Sanitize grove name for SSH host
     const hostName = sanitizeHostName(grove.name);
 
+    // Replace the Host line from the API with the sanitized hostname
+    const configLines = sshConfig.trim().split('\n');
+    const filteredLines = configLines.filter((l) => !l.trim().startsWith('Host '));
+
     // Append IdentityFile if not already present
     const identityFile = path.join(os.homedir(), '.ssh', 'orchard_ed25519');
-    const configLines = sshConfig.trim().split('\n');
     const hasIdentityFile = configLines.some((l) => l.trim().startsWith('IdentityFile'));
-    const fullConfig = hasIdentityFile ? sshConfig : sshConfig + `\n  IdentityFile ${identityFile}`;
+    const identityLine = hasIdentityFile ? '' : `\n  IdentityFile ${identityFile}`;
+    const fullConfig = `Host ${hostName}\n${filteredLines.join('\n')}${identityLine}`;
 
     const includeDirective = 'Include orchard_hosts/*';
 
@@ -196,7 +200,8 @@ export async function connectGrove(grove: GroveResponse, trellisClient: ITrellis
         }
 
         const winIdentityFile = `"${winSshDir}\\orchard_ed25519"`;
-        const winConfig = hasIdentityFile ? sshConfig : sshConfig + `\n  IdentityFile ${winIdentityFile}`;
+        const winIdentityLine = hasIdentityFile ? '' : `\n  IdentityFile ${winIdentityFile}`;
+        const winConfig = `Host ${hostName}\n${filteredLines.join('\n')}${winIdentityLine}`;
         await writeWindowsSshConfig(winSshDir, hostName, winConfig);
         logger.info(`connectGrove: wrote SSH config to Windows: ${winSshDir}`);
       } else {
