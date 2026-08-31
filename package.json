@@ -211,7 +211,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/vscode": "^1.134.0",
-    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
     "@typescript-eslint/parser": "^8.67.0",
     "@vscode/vsce": "^3.9.2",
     "css-loader": "^7.1.4",
