@@ -215,7 +215,7 @@
     "@typescript-eslint/parser": "^8.67.0",
     "@vscode/vsce": "^3.9.2",
     "css-loader": "^7.1.4",
-    "eslint": "^10.8.1",
+    "eslint": "^10.9.1",
     "html-webpack-plugin": "^5.6.8",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.6.2",
