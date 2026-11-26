@@ -42,6 +42,7 @@ vi.mock('eventsource', () => ({
 }));
 
 import * as vscode from 'vscode';
+import * as logger from '../../util/logger';
 import { SseManager } from '../sseManager';
 import type { AuthProvider } from '../../api/auth/authProvider';
 
@@ -131,6 +132,22 @@ describe('SseManager', () => {
 
     expect(created).toHaveLength(3);
     expect(created[2].url).toBe('http://trellis/api/groves/g2/events');
+  });
+
+  it('a rejecting isAuthenticated() is logged and leaves clients untouched', async () => {
+    const { auth, emitter } = makeAuth();
+    (auth.isAuthenticated as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'));
+    const warn = vi.spyOn(logger, 'warn');
+    const manager = new SseManager('http://trellis', auth);
+    manager.subscribe('g1');
+
+    emitter.fire();
+    await flush();
+
+    expect(created).toHaveLength(1);
+    expect(created[0].close).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('auth change handling failed: Error: boom'));
+    warn.mockRestore();
   });
 
   it('dispose() drops the auth subscription', async () => {

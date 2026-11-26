@@ -28,12 +28,16 @@ export class SseManager implements vscode.Disposable {
   }
 
   private async handleAuthChange(): Promise<void> {
-    if (await this.authProvider.isAuthenticated()) {
-      for (const client of Array.from(this.connections.values())) {
-        client.reconnect();
+    try {
+      if (await this.authProvider.isAuthenticated()) {
+        for (const client of Array.from(this.connections.values())) {
+          client.reconnect();
+        }
+      } else {
+        this.unsubscribeAll();
       }
-    } else {
-      this.unsubscribeAll();
+    } catch (err) {
+      logger.warn(`SseManager: auth change handling failed: ${err}`);
     }
   }
 
