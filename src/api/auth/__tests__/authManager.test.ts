@@ -575,6 +575,21 @@ describe('reporting', () => {
     expect(lastContext('orchard.authRequired')).toBe(true);
   });
 
+  it('tokenRejected with a newer stored token adopts it and fires no prompt and leaves authRequired untouched', async () => {
+    const s = setup({ stored: session() });
+    await s.manager.initialize();
+    const moved = session({ accessToken: 'access-b', refreshToken: 'refresh-b' });
+    s.listeners.length = 0;
+    await s.otherWindow.write(SERVER_NORM, moved);
+    await s.manager.reportUnauthorized({ tokenRejected: true });
+    expect(s.manager.getSession()).toEqual(moved);
+    expect(await s.persisted()).toEqual(moved);
+    expect(s.signInRequests()).toBe(0);
+    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(s.changes).toEqual([{ added: session() }]);
+    expect(await s.manager.getHeaders()).toEqual({ Authorization: 'Bearer access-b' });
+  });
+
   it('reportAuthorized clears authRequired', async () => {
     const s = setup({ stored: session() });
     await s.manager.initialize();

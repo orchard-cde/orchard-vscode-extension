@@ -120,11 +120,15 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
 
   async reportUnauthorized(report: UnauthorizedReport): Promise<void> {
     if (this.mode !== 'enabled') return;
-    this.setAuthRequired(true);
     const rejected = this.session;
     if (report.tokenRejected && rejected) {
-      await this.deleteIfCurrent(rejected.refreshToken, 'the server rejected its access token');
+      const adopted = await this.deleteIfCurrent(
+        rejected.refreshToken,
+        'the server rejected its access token',
+      );
+      if (adopted) return;
     }
+    this.setAuthRequired(true);
     if (!this.signInPromptShown) {
       this.signInPromptShown = true;
       this._onDidRequireSignIn.fire();
