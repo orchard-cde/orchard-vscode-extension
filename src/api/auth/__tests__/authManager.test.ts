@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('vscode', () => {
   class EventEmitter<T> {
@@ -179,6 +179,16 @@ function setup(opts: Setup = {}) {
 beforeEach(() => {
   vi.mocked(vscode.commands.executeCommand).mockReset();
 });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+}
 
 describe('initialize', () => {
   it('with a pre-populated secret: getSession() is set, orchard.signedIn=true, onDidChangeSession fires {added}', async () => {
@@ -491,13 +501,83 @@ describe('invalid_grant', () => {
   it('stored token equals the failed one → deletes, fires removed, signedIn=false', async () => {
     const s = setup({ stored: session({ expiresAt: NOW }) });
     await s.manager.initialize();
+    vi.useFakeTimers();
     s.fence.refresh.mockRejectedValueOnce(new FenceError('invalid_grant'));
-    expect(await s.manager.getHeaders()).toEqual({});
+    const headers = s.manager.getHeaders();
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(await s.persisted()).toEqual(session({ expiresAt: NOW }));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await headers).toEqual({});
     expect(await s.persisted()).toBeUndefined();
     expect(s.manager.getSession()).toBeUndefined();
-    await flush();
+    await vi.advanceTimersByTimeAsync(0);
     expect(s.changes).toEqual([{ added: session({ expiresAt: NOW }) }, { removed: session({ expiresAt: NOW }) }]);
     expect(s.authChanges()).toBe(2);
+    expect(lastContext('orchard.signedIn')).toBe(false);
+  });
+});
+
+describe('concurrent rotation across windows', () => {
+  it('two windows refresh with the same token: the loser waits, re-reads, adopts the winner\'s rotation and does not delete', async () => {
+    const s = setup({ stored: session({ expiresAt: NOW }) });
+    await s.manager.initialize();
+    vi.useFakeTimers();
+    s.fence.refresh.mockRejectedValueOnce(new FenceError('invalid_grant'));
+    let settled = false;
+    const headers = s.manager.getHeaders().finally(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(settled).toBe(false);
+    const winner = session({ accessToken: 'access-w', refreshToken: 'refresh-w' });
+    await s.otherWindow.write(SERVER_NORM, winner);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await headers).toEqual({ Authorization: 'Bearer access-w' });
+    expect(await s.persisted()).toEqual(winner);
+    expect(s.manager.getSession()).toEqual(winner);
+    expect(s.fence.refresh).toHaveBeenCalledTimes(1);
+    expect(s.changes.some((c) => c.removed)).toBe(false);
+  });
+
+  it('a refresh completing after another window deleted the session still persists the rotated tokens', async () => {
+    const s = setup({ stored: session({ expiresAt: NOW }) });
+    await s.manager.initialize();
+    const pending = deferred<TokenResponse>();
+    s.fence.refresh.mockReturnValueOnce(pending.promise);
+    const headers = s.manager.getHeaders();
+    await flush();
+    await s.otherWindow.delete(SERVER_NORM);
+    await flush();
+    expect(s.manager.getSession()).toBeUndefined();
+    pending.resolve(tokens('access-2', 'refresh-2', 600));
+    expect(await headers).toEqual({ Authorization: 'Bearer access-2' });
+    const rotated = session({ accessToken: 'access-2', refreshToken: 'refresh-2', expiresAt: NOW + 600 });
+    expect(await s.persisted()).toEqual(rotated);
+    expect(s.manager.getSession()).toEqual(rotated);
+    await flush();
+    expect(s.changes).toEqual([
+      { added: session({ expiresAt: NOW }) },
+      { removed: session({ expiresAt: NOW }) },
+      { added: rotated },
+    ]);
+    expect(lastContext('orchard.signedIn')).toBe(true);
+  });
+
+  it('a refresh completing after a local signOut discards its result and writes nothing', async () => {
+    const s = setup({ stored: session({ expiresAt: NOW }) });
+    await s.manager.initialize();
+    const pending = deferred<TokenResponse>();
+    s.fence.refresh.mockReturnValueOnce(pending.promise);
+    const headers = s.manager.getHeaders();
+    await flush();
+    await s.manager.signOut();
+    pending.resolve(tokens('access-2', 'refresh-2'));
+    expect(await headers).toEqual({});
+    await flush();
+    expect(await s.persisted()).toBeUndefined();
+    expect(s.manager.getSession()).toBeUndefined();
+    expect(s.changes).toEqual([
+      { added: session({ expiresAt: NOW }) },
+      { removed: session({ expiresAt: NOW }) },
+    ]);
     expect(lastContext('orchard.signedIn')).toBe(false);
   });
 });
@@ -588,6 +668,25 @@ describe('reporting', () => {
     expect(contextValues('orchard.authRequired')).toEqual([]);
     expect(s.changes).toEqual([{ added: session() }]);
     expect(await s.manager.getHeaders()).toEqual({ Authorization: 'Bearer access-b' });
+  });
+
+  it('a late 401 for a superseded access token is ignored', async () => {
+    const s = setup({ stored: session({ expiresAt: NOW }) });
+    await s.manager.initialize();
+    s.fence.refresh.mockResolvedValueOnce(tokens('access-2', 'refresh-2'));
+    expect(await s.manager.getHeaders()).toEqual({ Authorization: 'Bearer access-2' });
+    const rotated = session({ accessToken: 'access-2', refreshToken: 'refresh-2', expiresAt: NOW + 3600 });
+
+    await s.manager.reportUnauthorized({ tokenRejected: true, rejectedAccessToken: 'access-1' });
+    expect(await s.persisted()).toEqual(rotated);
+    expect(s.manager.getSession()).toEqual(rotated);
+    expect(s.signInRequests()).toBe(0);
+    expect(contextValues('orchard.authRequired')).toEqual([]);
+
+    await s.manager.reportUnauthorized({ tokenRejected: true, rejectedAccessToken: 'access-2' });
+    expect(await s.persisted()).toBeUndefined();
+    expect(s.signInRequests()).toBe(1);
+    expect(lastContext('orchard.authRequired')).toBe(true);
   });
 
   it('reportAuthorized clears authRequired', async () => {

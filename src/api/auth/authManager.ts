@@ -7,6 +7,7 @@ import * as logger from '../../util/logger';
 const REFRESH_SKEW_SECONDS = 30;
 const MODE_RETRY_SECONDS = 60;
 const CONFIG_TIMEOUT_MS = 10_000;
+const ROTATION_GRACE_MS = 2_000;
 
 export interface SessionChange {
   added?: StoredSession;
@@ -27,6 +28,10 @@ type AuthHeaders = Record<string, string>;
 
 function bearer(session: StoredSession): AuthHeaders {
   return { Authorization: `Bearer ${session.accessToken}` };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function describeError(err: unknown): string {
@@ -59,6 +64,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   private session: StoredSession | undefined;
   private refreshing: Promise<AuthHeaders> | undefined;
   private forceRefresh = false;
+  private signOutGeneration = 0;
   private storeReadSeq = 0;
 
   private authRequired = false;
@@ -107,7 +113,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     if (!this.forceRefresh && session.expiresAt - REFRESH_SKEW_SECONDS > this.now()) {
       return bearer(session);
     }
-    return this.refresh(session.refreshToken);
+    return this.refresh(session);
   }
 
   async isAuthenticated(): Promise<boolean> {
@@ -121,6 +127,14 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   async reportUnauthorized(report: UnauthorizedReport): Promise<void> {
     if (this.mode !== 'enabled') return;
     const rejected = this.session;
+    if (
+      report.tokenRejected &&
+      rejected &&
+      report.rejectedAccessToken !== undefined &&
+      report.rejectedAccessToken !== rejected.accessToken
+    ) {
+      return;
+    }
     if (report.tokenRejected && rejected) {
       const adopted = await this.deleteIfCurrent(
         rejected.refreshToken,
@@ -144,6 +158,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   async signOut(): Promise<void> {
+    this.signOutGeneration++;
     this.signInPromptShown = true;
     await this.store.delete(this.serverUrl);
     logger.info('Signed out of Orchard');
@@ -220,10 +235,10 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     return this.endpoints;
   }
 
-  private refresh(refreshToken: string): Promise<AuthHeaders> {
+  private refresh(session: StoredSession): Promise<AuthHeaders> {
     if (!this.refreshing) {
       this.forceRefresh = false;
-      this.refreshing = this.refreshOnce(refreshToken, 1).finally(() => {
+      this.refreshing = this.refreshOnce(session, 1, this.signOutGeneration).finally(() => {
         this.refreshing = undefined;
       });
     }
@@ -231,13 +246,19 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   // Fence rotates refresh tokens, and other windows share the keychain entry: an invalid_grant
-  // usually means someone else already rotated, so adopt their result before giving up.
-  private async refreshOnce(refreshToken: string, attempt: number): Promise<AuthHeaders> {
+  // usually means someone else already rotated, so adopt their result before giving up. A
+  // successful rotation is always persisted (it is the only valid refresh token) unless this
+  // window signed out meanwhile.
+  private async refreshOnce(
+    base: StoredSession,
+    attempt: number,
+    generation: number,
+  ): Promise<AuthHeaders> {
+    const refreshToken = base.refreshToken;
     try {
       const endpoints = await this.getEndpoints();
       const response = await this.fence.refresh(endpoints, refreshToken);
-      const base = this.session;
-      if (!base) return {};
+      if (generation !== this.signOutGeneration) return {};
       const next: StoredSession = {
         ...base,
         accessToken: response.accessToken,
@@ -245,14 +266,19 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
         expiresAt: this.now() + response.expiresIn,
       };
       await this.store.write(this.serverUrl, next);
+      if (generation !== this.signOutGeneration) return {};
       this.applySession(next);
       return bearer(next);
     } catch (err) {
       if (err instanceof FenceError && err.code === 'invalid_grant') {
-        const stored = await this.deleteIfCurrent(refreshToken, 'its refresh token was rejected');
+        const stored = await this.deleteIfCurrent(
+          refreshToken,
+          'its refresh token was rejected',
+          ROTATION_GRACE_MS,
+        );
         if (!stored) return {};
         if (stored.expiresAt - REFRESH_SKEW_SECONDS > this.now()) return bearer(stored);
-        if (attempt < 2) return this.refreshOnce(stored.refreshToken, attempt + 1);
+        if (attempt < 2) return this.refreshOnce(stored, attempt + 1, generation);
         return {};
       }
       logger.warn(`Token refresh failed: ${describeError(err)}`);
@@ -263,13 +289,19 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
 
   /**
    * Compare-before-delete: deletes the stored session only if it still holds `refreshToken`;
-   * otherwise adopts the stored session (written by another window) and returns it.
+   * otherwise adopts the stored session (written by another window) and returns it. A non-zero
+   * `graceMs` gives a concurrent rotation in another window time to persist before deciding.
    */
   private async deleteIfCurrent(
     refreshToken: string,
     reason: string,
+    graceMs = 0,
   ): Promise<StoredSession | undefined> {
-    const stored = await this.store.read(this.serverUrl);
+    let stored = await this.store.read(this.serverUrl);
+    if (stored && stored.refreshToken === refreshToken && graceMs > 0) {
+      await delay(graceMs);
+      stored = await this.store.read(this.serverUrl);
+    }
     if (stored && stored.refreshToken !== refreshToken) {
       this.applySession(stored);
       return stored;

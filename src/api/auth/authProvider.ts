@@ -4,6 +4,8 @@ export type AuthMode = 'disabled' | 'unknown' | 'enabled';
 
 export interface UnauthorizedReport {
   tokenRejected: boolean;
+  /** The access token the rejected request carried; a stale token is ignored. */
+  rejectedAccessToken?: string;
 }
 
 export interface AuthProvider {
