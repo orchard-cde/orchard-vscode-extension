@@ -51,9 +51,12 @@ export class FenceError extends Error {
 }
 
 export class FenceTransportError extends Error {
-  constructor(message: string, cause?: unknown) {
+  readonly status: number | undefined;
+
+  constructor(message: string, cause?: unknown, status?: number) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = 'FenceTransportError';
+    this.status = status;
   }
 }
 
@@ -183,19 +186,24 @@ export class FenceClient {
       throw new FenceTransportError(`fence returned a non-JSON response (HTTP ${status})`);
     }
 
+    // RFC 6749 §5.2: OAuth error bodies come with 400 or 401; any other status carrying an
+    // unrecognised `error` (e.g. a Spring error page) is a transport failure, not an OAuth error.
     if (isObject(parsed) && typeof parsed.error === 'string') {
-      const code = (KNOWN_ERROR_CODES as readonly string[]).includes(parsed.error)
-        ? (parsed.error as FenceErrorCode)
-        : 'other';
-      const description =
-        typeof parsed.error_description === 'string' && parsed.error_description !== ''
-          ? parsed.error_description
-          : undefined;
-      throw new FenceError(code, description);
+      const raw = parsed.error;
+      const known = (KNOWN_ERROR_CODES as readonly string[]).includes(raw);
+      if (known || status === 400 || status === 401) {
+        const description =
+          typeof parsed.error_description === 'string' && parsed.error_description !== ''
+            ? parsed.error_description
+            : undefined;
+        throw known
+          ? new FenceError(raw as FenceErrorCode, description)
+          : new FenceError('other', description ?? `fence error: other (${raw})`);
+      }
     }
 
     if (status < 200 || status >= 300) {
-      throw new FenceTransportError(`fence returned HTTP ${status}`);
+      throw new FenceTransportError(`fence returned HTTP ${status}`, undefined, status);
     }
     if (!isObject(parsed)) {
       throw new FenceTransportError('fence returned an unexpected JSON payload');

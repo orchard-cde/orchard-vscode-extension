@@ -167,6 +167,23 @@ describe('FenceClient.pollDeviceToken', () => {
     const err = await client.pollDeviceToken(endpoints, 'd').catch((e) => e);
     expect(err).toBeInstanceOf(FenceError);
     expect(err.code).toBe('other');
+    expect(err.message).toBe('fence error: other (server_exploded)');
+  });
+
+  it('a Spring-style error body on a 500 becomes FenceTransportError carrying the status', async () => {
+    const client = new FenceClient(
+      asFetch(stub(() => json({ error: 'Internal Server Error', status: 500 }, 500))),
+    );
+    const err = await client.refresh(endpoints, 'rt').catch((e) => e);
+    expect(err).toBeInstanceOf(FenceTransportError);
+    expect(err.status).toBe(500);
+  });
+
+  it('a known OAuth error code is a FenceError even on an unexpected status', async () => {
+    const client = new FenceClient(asFetch(stub(() => json({ error: 'invalid_grant' }, 403))));
+    const err = await client.refresh(endpoints, 'rt').catch((e) => e);
+    expect(err).toBeInstanceOf(FenceError);
+    expect(err.code).toBe('invalid_grant');
   });
 
   it('leaves refreshToken undefined when the response has none', async () => {

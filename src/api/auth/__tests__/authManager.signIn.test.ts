@@ -286,6 +286,16 @@ describe('signIn', () => {
     await vi.advanceTimersByTimeAsync(0);
   });
 
+  it('rejects a non-http(s) verification URL without opening it or polling', async () => {
+    const s = setup({ auth: deviceAuth({ verificationUriComplete: 'file:///etc/passwd' }) });
+    await s.manager.initialize();
+    await expect(s.manager.signIn()).rejects.toThrow('Sign-in failed: unsupported verification URL');
+    expect(vscode.env.openExternal).not.toHaveBeenCalled();
+    expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+    expect(s.fence.pollDeviceToken).not.toHaveBeenCalled();
+    expect(await s.persisted()).toBeUndefined();
+  });
+
   it('polls every max(interval,5) s and resolves on token; writes session with account from JWT', async () => {
     const s = setup({ auth: deviceAuth({ interval: 2 }) });
     s.fence.pollDeviceToken

@@ -40,6 +40,15 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isWebUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -214,12 +223,16 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       throw new Error(`Sign-in failed: ${describeError(err)}`);
     }
 
+    const verificationUri = auth.verificationUriComplete ?? auth.verificationUri;
+    if (!isWebUrl(verificationUri)) {
+      throw new Error('Sign-in failed: unsupported verification URL');
+    }
+
     try {
       await vscode.env.clipboard.writeText(auth.userCode);
     } catch (err) {
       logger.warn(`Could not copy the sign-in code to the clipboard: ${describeError(err)}`);
     }
-    const verificationUri = auth.verificationUriComplete ?? auth.verificationUri;
     try {
       await vscode.env.openExternal(vscode.Uri.parse(verificationUri));
     } catch (err) {
