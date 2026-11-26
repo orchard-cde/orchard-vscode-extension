@@ -56,19 +56,7 @@ export class TrellisClient implements ITrellisClient {
   }
 
   async getSshConfig(id: string): Promise<string> {
-    const authHeaders = await this.authProvider.getHeaders();
-    const response = await fetch(`${this.baseUrl}/api/groves/${id}/ssh-config`, {
-      method: 'GET',
-      headers: {
-        ...authHeaders,
-      },
-    });
-
-    if (!response.ok) {
-      const message = await this.extractErrorMessage(response);
-      throw new TrellisApiError(response.status, response.statusText, message);
-    }
-
+    const response = await this.send('GET', `/api/groves/${id}/ssh-config`);
     return response.text();
   }
 
@@ -81,33 +69,56 @@ export class TrellisClient implements ITrellisClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const authHeaders = await this.authProvider.getHeaders();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-    };
-
-    const options: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (body !== undefined) {
-      options.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(`${this.baseUrl}${path}`, options);
-
-    if (!response.ok) {
-      const message = await this.extractErrorMessage(response);
-      throw new TrellisApiError(response.status, response.statusText, message);
-    }
+    const response = await this.send(method, path, body, { 'Content-Type': 'application/json' });
 
     if (response.status === 204) {
       return undefined as T;
     }
 
     return response.json() as Promise<T>;
+  }
+
+  private async send(
+    method: string,
+    path: string,
+    body?: unknown,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<Response> {
+    const attempt = async () => {
+      const headers = { ...extraHeaders, ...(await this.authProvider.getHeaders()) };
+      const options: RequestInit = { method, headers };
+      if (body !== undefined) {
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch(`${this.baseUrl}${path}`, options);
+      return { response, bearer: bearerOf(headers) };
+    };
+
+    let { response, bearer } = await attempt();
+
+    if (response.status === 401 && bearer !== undefined) {
+      this.authProvider.invalidate();
+      ({ response, bearer } = await attempt());
+    }
+
+    if (response.status === 401) {
+      if (this.authProvider.getMode() === 'enabled') {
+        await this.authProvider.reportUnauthorized(
+          bearer === undefined
+            ? { tokenRejected: false }
+            : { tokenRejected: true, rejectedAccessToken: bearer },
+        );
+      }
+    } else if (response.ok && bearer !== undefined) {
+      this.authProvider.reportAuthorized();
+    }
+
+    if (!response.ok) {
+      const message = await this.extractErrorMessage(response);
+      throw new TrellisApiError(response.status, response.statusText, message);
+    }
+
+    return response;
   }
 
   private async extractErrorMessage(response: Response): Promise<string> {
@@ -119,4 +130,9 @@ export class TrellisClient implements ITrellisClient {
       return `${response.status} ${response.statusText}`;
     }
   }
+}
+
+function bearerOf(headers: Record<string, string>): string | undefined {
+  const value = headers['Authorization'];
+  return value?.startsWith('Bearer ') ? value.slice('Bearer '.length) : undefined;
 }
