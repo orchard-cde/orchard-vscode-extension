@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import EventSource from 'eventsource';
 import { AuthProvider } from './auth/authProvider';
+import { createAuthFetch } from './auth/authFetch';
 import { GroveStateChangedEvent } from './types';
 import * as logger from '../util/logger';
 
@@ -28,13 +29,23 @@ export class SseClient implements vscode.Disposable {
 
   /**
    * Open an EventSource connection for the given grove.
-   *
-   * NOTE: The standard EventSource API does not support custom headers.
-   * For V1 (unauthenticated SSE) we connect without auth headers.
-   * When auth is required for SSE, consider using a polyfill that supports
-   * custom headers or pass credentials via query parameters.
    */
   connect(groveId: string): void {
+    this.close();
+    this.groveId = groveId;
+    this.reconnectDelay = 1000;
+    this.openConnection();
+  }
+
+  /**
+   * Re-open the connection for the current grove, e.g. after auth changes.
+   * No-op when no grove is set.
+   */
+  reconnect(): void {
+    if (!this.groveId) {
+      return;
+    }
+    const groveId = this.groveId;
     this.close();
     this.groveId = groveId;
     this.reconnectDelay = 1000;
@@ -66,7 +77,9 @@ export class SseClient implements vscode.Disposable {
     const url = `${this.baseUrl}/api/groves/${this.groveId}/events`;
     logger.info(`SSE: connecting to ${url}`);
 
-    this.eventSource = new EventSource(url);
+    this.eventSource = new EventSource(url, {
+      fetch: createAuthFetch(this._authProvider),
+    });
 
     this.eventSource.addEventListener('grove-state-changed', (event) => {
       try {
