@@ -458,11 +458,13 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   private setAuthRequired(value: boolean): void {
+    if (this.disposed) return;
     this.authRequired = value;
     this.setContext('orchard.authRequired', value);
   }
 
   private setContext(key: string, value: boolean): void {
+    if (this.disposed) return;
     try {
       Promise.resolve(vscode.commands.executeCommand('setContext', key, value)).catch(
         (err: unknown) => logger.warn(`Failed to set context ${key}: ${describeError(err)}`),

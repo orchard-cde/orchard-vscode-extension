@@ -95,16 +95,21 @@ export class TrellisClient implements ITrellisClient {
     };
 
     let { response, bearer } = await attempt();
+    let retriedSameBearer = false;
 
     if (response.status === 401 && bearer !== undefined) {
+      const firstBearer = bearer;
       this.authProvider.invalidate();
       ({ response, bearer } = await attempt());
+      retriedSameBearer = bearer === firstBearer;
     }
 
     if (response.status === 401) {
       if (this.authProvider.getMode() === 'enabled') {
+        // An unchanged bearer means the refresh failed without rejecting the session (e.g. a
+        // network error), so it must not be treated as a rejected token and deleted.
         await this.authProvider.reportUnauthorized(
-          bearer === undefined
+          bearer === undefined || retriedSameBearer
             ? { tokenRejected: false }
             : { tokenRejected: true, rejectedAccessToken: bearer },
         );

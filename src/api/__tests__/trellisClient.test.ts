@@ -65,6 +65,17 @@ describe('TrellisClient', () => {
     expect(auth.reportAuthorized).toHaveBeenCalledTimes(1);
   });
 
+  it('retry with the same bearer after a failed refresh reports tokenRejected:false', async () => {
+    const auth = makeAuth('enabled', ['same', 'same']);
+    fetchMock.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(unauthorized());
+    const err = await new TrellisClient(BASE, auth).listGroves().catch((e) => e);
+    expect(err).toBeInstanceOf(TrellisApiError);
+    expect(err.statusCode).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(auth.reportUnauthorized).toHaveBeenCalledTimes(1);
+    expect(auth.reportUnauthorized).toHaveBeenCalledWith({ tokenRejected: false });
+  });
+
   it('second 401 with bearer on retry → reportUnauthorized({tokenRejected:true}) and throws TrellisApiError 401', async () => {
     const auth = makeAuth('enabled', ['old', 'new']);
     fetchMock.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(unauthorized());

@@ -647,6 +647,25 @@ describe('reporting', () => {
     expect(await unknown.persisted()).toEqual(session());
   });
 
+  it('reportUnauthorized on a disposed manager writes no context keys and fires nothing', async () => {
+    const s = setup({ stored: session() });
+    await s.manager.initialize();
+    const internals = s.manager as unknown as Record<string, { fire: () => void }>;
+    const fires = ['_onDidRequireSignIn', '_onDidChangeSession', '_onDidChangeAuthentication'].map(
+      (name) => vi.spyOn(internals[name], 'fire'),
+    );
+    vi.mocked(vscode.commands.executeCommand).mockClear();
+
+    const inFlight = s.manager.reportUnauthorized({ tokenRejected: false });
+    s.manager.dispose();
+    await inFlight;
+    await s.manager.reportUnauthorized({ tokenRejected: true, rejectedAccessToken: 'access-1' });
+
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+    for (const fire of fires) expect(fire).not.toHaveBeenCalled();
+    expect(await s.persisted()).toEqual(session());
+  });
+
   it('reportUnauthorized sets authRequired=true and fires onDidRequireSignIn once until sign-in succeeds', async () => {
     const s = setup();
     await s.manager.initialize();
