@@ -10,10 +10,19 @@ import {
   CMD_GROVE_COPY_ID,
   CMD_GROVE_SHOW_DETAILS,
   CMD_SHOW_DASHBOARD,
+  CMD_SIGN_IN,
+  CMD_SIGN_OUT,
   CONFIG_SERVER_URL,
-  CONFIG_CULTIVATOR_ID,
 } from './constants';
-import { HeaderAuthProvider } from './api/auth/headerAuthProvider';
+import {
+  AuthManager,
+  SessionStore,
+  FenceClient,
+  OrchardAuthenticationProvider,
+  AUTH_PROVIDER_ID,
+  AUTH_PROVIDER_LABEL,
+} from './api/auth';
+import { TrellisApiError } from './api/types';
 import { TrellisClient, ITrellisClient } from './api/trellisClient';
 import { MockTrellisClient } from './mock/mockTrellisClient';
 import { GroveManager } from './services/groveManager';
@@ -34,7 +43,10 @@ import { refreshGroves } from './commands/refreshGroves';
 import { TrowelService } from './services/trowelService';
 import { TrowelUpdater } from './services/trowelUpdater';
 
-let authProvider: HeaderAuthProvider | undefined;
+let sessionStore: SessionStore;
+let fenceClient: FenceClient;
+let authenticationProvider: OrchardAuthenticationProvider;
+let authManager: AuthManager | undefined;
 let trellisClient: ITrellisClient | undefined;
 let sseManager: SseManager | undefined;
 let groveManager: GroveManager | undefined;
@@ -44,23 +56,43 @@ let groveTreeView: vscode.TreeView<unknown> | undefined;
 
 function initializeServices(context: vscode.ExtensionContext, serverUrl: string, mockMode: boolean): void {
   // Dispose previous instances
-  authProvider?.dispose();
+  authManager?.dispose();
   sseManager?.dispose();
   groveManager?.dispose();
   treeDataProvider?.dispose();
 
-  authProvider = new HeaderAuthProvider();
-  trellisClient = mockMode ? new MockTrellisClient() : new TrellisClient(serverUrl, authProvider);
+  const manager = new AuthManager({ serverUrl, store: sessionStore, fence: fenceClient, mock: mockMode });
+  authManager = manager;
+  authenticationProvider.setManager(manager);
+  void manager.initialize().catch((err) => {
+    logger.warn(`Failed to initialize Orchard authentication: ${err}`);
+  });
+
+  trellisClient = mockMode ? new MockTrellisClient() : new TrellisClient(serverUrl, manager);
 
   if (!mockMode && getSseEnabled()) {
-    sseManager = new SseManager(serverUrl, authProvider);
+    sseManager = new SseManager(serverUrl, manager);
   } else {
     sseManager = undefined;
   }
 
-  groveManager = new GroveManager(trellisClient, sseManager);
-  treeDataProvider = new GroveTreeDataProvider(groveManager);
-  webviewProvider = new OrchardWebviewProvider(context, trellisClient, groveManager, sseManager);
+  const groves = new GroveManager(trellisClient, sseManager);
+  groveManager = groves;
+  treeDataProvider = new GroveTreeDataProvider(groves);
+  webviewProvider = new OrchardWebviewProvider(context, trellisClient, groves, sseManager);
+
+  manager.onDidRequireSignIn(async () => {
+    const action = await vscode.window.showInformationMessage('Orchard needs you to sign in.', 'Sign In');
+    if (action === 'Sign In') {
+      vscode.commands.executeCommand(CMD_SIGN_IN);
+    }
+  });
+  manager.onDidChangeAuthentication(() => {
+    if (!manager.getSession()) groves.clearCache();
+    groves.refresh().catch((err) => {
+      logger.warn(`Failed to refresh groves after authentication change: ${err}`);
+    });
+  });
 }
 
 function createTreeView(
@@ -90,6 +122,19 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize log level from configuration (env var overrides for launch configs)
   const envLogLevel = process.env.ORCHARD_LOG_LEVEL as LogLevel | undefined;
   logger.setLogLevel(envLogLevel || (getLogLevel() as LogLevel));
+
+  sessionStore = new SessionStore(context.secrets);
+  fenceClient = new FenceClient();
+  authenticationProvider = new OrchardAuthenticationProvider();
+  context.subscriptions.push(
+    authenticationProvider,
+    vscode.authentication.registerAuthenticationProvider(
+      AUTH_PROVIDER_ID,
+      AUTH_PROVIDER_LABEL,
+      authenticationProvider,
+      { supportsMultipleAccounts: false },
+    ),
+  );
 
   // Set configured context for when-clauses in package.json
   vscode.commands.executeCommand('setContext', 'orchard.configured', !!serverUrl || mockMode);
@@ -184,10 +229,29 @@ export function activate(context: vscode.ExtensionContext): void {
     webviewProvider?.show();
   });
 
+  registerCommand(context, CMD_SIGN_IN, () => {
+    if (!authManager) {
+      vscode.window.showInformationMessage('Configure your Orchard server URL first.');
+      return;
+    }
+    authManager.signIn().catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message !== 'Sign-in cancelled') {
+        vscode.window.showErrorMessage(message);
+      }
+    });
+  });
+
+  registerCommand(context, CMD_SIGN_OUT, () => {
+    authManager?.signOut().catch((err) => {
+      logger.error(`Failed to sign out: ${err}`);
+    });
+  });
+
   // Listen for configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration(CONFIG_SERVER_URL) || e.affectsConfiguration(CONFIG_CULTIVATOR_ID)) {
+      if (e.affectsConfiguration(CONFIG_SERVER_URL)) {
         const newServerUrl = getServerUrl();
         vscode.commands.executeCommand('setContext', 'orchard.configured', !!newServerUrl || mockMode);
 
@@ -202,6 +266,13 @@ export function activate(context: vscode.ExtensionContext): void {
           logger.info(`Orchard reconfigured with server: ${newServerUrl}`);
         } else {
           groveManager?.stopPolling();
+          sseManager?.unsubscribeAll();
+          groveManager?.clearCache();
+          authManager?.dispose();
+          authManager = undefined;
+          authenticationProvider.setManager(undefined);
+          vscode.commands.executeCommand('setContext', 'orchard.signedIn', false);
+          vscode.commands.executeCommand('setContext', 'orchard.authRequired', false);
           logger.info('Orchard server URL cleared; polling stopped.');
         }
       }
@@ -212,6 +283,10 @@ export function activate(context: vscode.ExtensionContext): void {
   if (groveManager) {
     groveManager.startPolling();
     groveManager.refresh().catch(async (err) => {
+      if (err instanceof TrellisApiError && err.statusCode === 401) {
+        logger.info('Initial grove refresh needs sign-in');
+        return;
+      }
       logger.error(`Failed initial grove refresh: ${err}`);
       const action = await vscode.window.showErrorMessage(
         'Could not connect to Orchard server. Check your server URL.',
@@ -243,9 +318,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   // Push service disposables
-  if (authProvider) {
-    context.subscriptions.push(authProvider);
-  }
+  context.subscriptions.push({ dispose: () => authManager?.dispose() });
   if (sseManager) {
     context.subscriptions.push(sseManager);
   }

@@ -13,6 +13,7 @@ import * as logger from '../util/logger';
 export class SseManager implements vscode.Disposable {
   private readonly connections = new Map<string, SseClient>();
   private readonly connectionDisposables = new Map<string, vscode.Disposable>();
+  private readonly authSubscription: vscode.Disposable;
 
   private readonly _onGroveStateChanged = new vscode.EventEmitter<GroveStateChangedEvent>();
   readonly onGroveStateChanged: vscode.Event<GroveStateChangedEvent> = this._onGroveStateChanged.event;
@@ -20,7 +21,25 @@ export class SseManager implements vscode.Disposable {
   constructor(
     private readonly baseUrl: string,
     private readonly authProvider: AuthProvider,
-  ) {}
+  ) {
+    this.authSubscription = authProvider.onDidChangeAuthentication(() => {
+      void this.handleAuthChange();
+    });
+  }
+
+  private async handleAuthChange(): Promise<void> {
+    try {
+      if (await this.authProvider.isAuthenticated()) {
+        for (const client of Array.from(this.connections.values())) {
+          client.reconnect();
+        }
+      } else {
+        this.unsubscribeAll();
+      }
+    } catch (err) {
+      logger.warn(`SseManager: auth change handling failed: ${err}`);
+    }
+  }
 
   /**
    * Subscribe to SSE events for the given grove.
@@ -72,6 +91,7 @@ export class SseManager implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.authSubscription.dispose();
     this.unsubscribeAll();
     this._onGroveStateChanged.dispose();
   }

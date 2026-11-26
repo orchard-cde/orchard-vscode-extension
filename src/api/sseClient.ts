@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import EventSource from 'eventsource';
+import { EventSource } from 'eventsource';
 import { AuthProvider } from './auth/authProvider';
+import { createAuthFetch } from './auth/authFetch';
 import { GroveStateChangedEvent } from './types';
 import * as logger from '../util/logger';
 
@@ -11,34 +12,41 @@ import * as logger from '../util/logger';
  * `GroveStateChangedEvent` objects whenever the grove state changes.
  */
 export class SseClient implements vscode.Disposable {
+  private static readonly INITIAL_RECONNECT_DELAY = 1000;
+  private static readonly MAX_RECONNECT_DELAY = 30_000;
+
   private eventSource: EventSource | undefined;
-  private reconnectDelay = 1000;
+  private reconnectDelay = SseClient.INITIAL_RECONNECT_DELAY;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private groveId: string | undefined;
-
-  private static readonly MAX_RECONNECT_DELAY = 30_000;
+  private readonly authFetch: typeof fetch;
 
   private readonly _onGroveStateChanged = new vscode.EventEmitter<GroveStateChangedEvent>();
   readonly onGroveStateChanged: vscode.Event<GroveStateChangedEvent> = this._onGroveStateChanged.event;
 
   constructor(
     private readonly baseUrl: string,
-    private readonly _authProvider: AuthProvider,
-  ) {}
+    authProvider: AuthProvider,
+  ) {
+    this.authFetch = createAuthFetch(authProvider);
+  }
 
   /**
    * Open an EventSource connection for the given grove.
-   *
-   * NOTE: The standard EventSource API does not support custom headers.
-   * For V1 (unauthenticated SSE) we connect without auth headers.
-   * When auth is required for SSE, consider using a polyfill that supports
-   * custom headers or pass credentials via query parameters.
    */
   connect(groveId: string): void {
     this.close();
     this.groveId = groveId;
-    this.reconnectDelay = 1000;
+    this.reconnectDelay = SseClient.INITIAL_RECONNECT_DELAY;
     this.openConnection();
+  }
+
+  /**
+   * Re-open the connection for the current grove, e.g. after auth changes.
+   * No-op when no grove is set.
+   */
+  reconnect(): void {
+    if (this.groveId) this.connect(this.groveId);
   }
 
   close(): void {
@@ -46,16 +54,20 @@ export class SseClient implements vscode.Disposable {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = undefined;
-    }
+    this.closeSource();
     this.groveId = undefined;
   }
 
   dispose(): void {
     this.close();
     this._onGroveStateChanged.dispose();
+  }
+
+  private closeSource(): void {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = undefined;
+    }
   }
 
   private openConnection(): void {
@@ -66,7 +78,7 @@ export class SseClient implements vscode.Disposable {
     const url = `${this.baseUrl}/api/groves/${this.groveId}/events`;
     logger.info(`SSE: connecting to ${url}`);
 
-    this.eventSource = new EventSource(url);
+    this.eventSource = new EventSource(url, { fetch: this.authFetch });
 
     this.eventSource.addEventListener('grove-state-changed', (event) => {
       try {
@@ -74,7 +86,7 @@ export class SseClient implements vscode.Disposable {
         logger.info(
           `SSE: grove ${data.groveId} state changed: ${data.previousState} → ${data.newState}`,
         );
-        this.reconnectDelay = 1000; // Reset backoff on successful event
+        this.reconnectDelay = SseClient.INITIAL_RECONNECT_DELAY;
         this._onGroveStateChanged.fire(data);
       } catch (err) {
         logger.warn(`SSE: failed to parse event data: ${err}`);
@@ -85,19 +97,11 @@ export class SseClient implements vscode.Disposable {
       logger.warn(
         `SSE: connection error for grove ${this.groveId}, reconnecting in ${this.reconnectDelay}ms`,
       );
-
-      // Close the current broken connection
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = undefined;
-      }
-
-      // Schedule reconnect with exponential backoff
+      this.closeSource();
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = undefined;
         this.openConnection();
       }, this.reconnectDelay);
-
       this.reconnectDelay = Math.min(
         this.reconnectDelay * 2,
         SseClient.MAX_RECONNECT_DELAY,
@@ -106,7 +110,7 @@ export class SseClient implements vscode.Disposable {
 
     this.eventSource.onopen = () => {
       logger.info(`SSE: connected for grove ${this.groveId}`);
-      this.reconnectDelay = 1000; // Reset backoff on successful connection
+      this.reconnectDelay = SseClient.INITIAL_RECONNECT_DELAY;
     };
   }
 }
