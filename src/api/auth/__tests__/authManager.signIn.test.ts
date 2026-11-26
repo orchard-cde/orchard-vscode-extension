@@ -498,6 +498,54 @@ describe('signIn', () => {
     await vi.advanceTimersByTimeAsync(0);
   });
 
+  it('signIn re-fetches auth config and succeeds when the server has switched from disabled to enabled since initialize()', async () => {
+    const s = setup({ config: () => json({ issuer: null }) });
+    await s.manager.initialize();
+    expect(s.manager.getMode()).toBe('disabled');
+    expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+
+    s.setConfig(() => json({ issuer: ISSUER }));
+    s.fence.pollDeviceToken.mockResolvedValueOnce(tokens());
+    vi.useFakeTimers();
+    const promise = s.manager.signIn();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await promise).toEqual(signedInSession());
+    expect(s.fetchImpl).toHaveBeenCalledTimes(2);
+    expect(s.manager.getMode()).toBe('enabled');
+    expect(s.fence.discover).toHaveBeenCalledWith(ISSUER);
+    expect(await s.persisted()).toEqual(signedInSession());
+    expect(s.changes).toEqual([{ added: signedInSession() }]);
+  });
+
+  it('a refresh of the old session completing after a new sign-in does not overwrite it', async () => {
+    const old: StoredSession = {
+      accessToken: 'access-old',
+      refreshToken: 'refresh-old',
+      expiresAt: NOW,
+      issuer: ISSUER,
+      account: { id: 'u-old', label: 'old@example.com' },
+    };
+    const s = setup({ stored: old });
+    await s.manager.initialize();
+    vi.useFakeTimers();
+    let resolveRefresh!: (t: TokenResponse) => void;
+    s.fence.refresh.mockReturnValueOnce(new Promise((r) => (resolveRefresh = r)));
+    const headers = s.manager.getHeaders();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.fence.refresh).toHaveBeenCalledWith(endpoints, 'refresh-old');
+
+    s.fence.pollDeviceToken.mockResolvedValueOnce(tokens());
+    const promise = s.manager.signIn();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await promise).toEqual(signedInSession());
+
+    resolveRefresh(tokens('access-old-2', 'refresh-old-2', 3600));
+    expect(await headers).toEqual({});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await s.persisted()).toEqual(signedInSession());
+    expect(s.manager.getSession()).toEqual(signedInSession());
+  });
+
   it('mock mode rejects with "Sign-in is not available in mock mode"', async () => {
     const s = setup({ mock: true });
     await expect(s.manager.signIn()).rejects.toThrow('Sign-in is not available in mock mode');

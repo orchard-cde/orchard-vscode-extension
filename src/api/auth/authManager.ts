@@ -65,7 +65,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   private issuer: string | undefined;
   private lastProbeAt: number | undefined;
   private probe: Promise<AuthMode> | undefined;
-  private endpoints: Promise<FenceEndpoints> | undefined;
+  private endpoints: { issuer: string; promise: Promise<FenceEndpoints> } | undefined;
 
   private session: StoredSession | undefined;
   private refreshing: Promise<AuthHeaders> | undefined;
@@ -190,7 +190,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
 
   private async runSignIn(): Promise<StoredSession> {
     if (this.mock) throw new Error('Sign-in is not available in mock mode');
-    const mode = await this.resolveMode(true);
+    const mode = await this.discoverMode();
     if (mode === 'disabled') throw new Error('This Orchard server has authentication disabled');
     if (mode === 'unknown') throw new Error('Could not reach the Orchard server to start sign-in');
     const issuer = this.issuer as string;
@@ -242,6 +242,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       issuer,
       account,
     };
+    this.signOutGeneration++;
     await this.store.write(this.serverUrl, session);
     this.applySession(session);
     this.setAuthRequired(false);
@@ -259,6 +260,11 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     ) {
       return Promise.resolve(this.mode);
     }
+    return this.discoverMode();
+  }
+
+  /** Fetches the auth config regardless of the cached mode; a failed fetch leaves the cache intact. */
+  private discoverMode(): Promise<AuthMode> {
     if (!this.probe) {
       this.probe = this.probeMode().finally(() => {
         this.probe = undefined;
@@ -279,38 +285,46 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       });
       if (!response.ok) {
         logger.warn(`Auth discovery at ${url} returned HTTP ${response.status}`);
-        return this.mode;
+        return 'unknown';
       }
       const body: unknown = await response.json();
       if (typeof body !== 'object' || body === null || !('issuer' in body)) {
         logger.warn(`Auth discovery at ${url} returned no issuer field`);
-        return this.mode;
+        return 'unknown';
       }
       const { issuer } = body as { issuer: unknown };
       if (issuer === null) {
+        this.issuer = undefined;
         this.mode = 'disabled';
-      } else if (typeof issuer === 'string' && issuer !== '') {
+        return this.mode;
+      }
+      if (typeof issuer === 'string' && issuer !== '') {
         this.issuer = issuer;
         this.mode = 'enabled';
-      } else {
-        logger.warn(`Auth discovery at ${url} returned an invalid issuer`);
+        return this.mode;
       }
+      logger.warn(`Auth discovery at ${url} returned an invalid issuer`);
     } catch (err) {
       logger.warn(`Auth discovery at ${url} failed: ${describeError(err)}`);
     } finally {
       clearTimeout(timer);
     }
-    return this.mode;
+    return 'unknown';
   }
 
   private getEndpoints(): Promise<FenceEndpoints> {
-    if (!this.endpoints) {
-      this.endpoints = this.fence.discover(this.issuer as string).catch((err: unknown) => {
-        this.endpoints = undefined;
-        throw err;
-      });
+    const issuer = this.issuer as string;
+    if (this.endpoints?.issuer !== issuer) {
+      const entry = {
+        issuer,
+        promise: this.fence.discover(issuer).catch((err: unknown) => {
+          if (this.endpoints === entry) this.endpoints = undefined;
+          throw err;
+        }),
+      };
+      this.endpoints = entry;
     }
-    return this.endpoints;
+    return this.endpoints.promise;
   }
 
   private refresh(session: StoredSession): Promise<AuthHeaders> {
