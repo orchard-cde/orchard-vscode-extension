@@ -216,6 +216,19 @@ describe('initialize', () => {
     expect(contextValues('orchard.authRequired')).toEqual([false]);
   });
 
+  it('getHeaders() called while initialize() is in flight waits and returns the stored bearer, firing no prompt', async () => {
+    const s = setup({ stored: session() });
+    const init = s.manager.initialize();
+    const headers = s.manager.getHeaders();
+    const authenticated = s.manager.isAuthenticated();
+    expect(await headers).toEqual({ Authorization: 'Bearer access-1' });
+    expect(await authenticated).toBe(true);
+    await init;
+    expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(s.signInRequests()).toBe(0);
+    expect(contextValues('orchard.authRequired')).not.toContain(true);
+  });
+
   it('constructor alone reads nothing from the store', async () => {
     const s = setup({ stored: session() });
     await flush();

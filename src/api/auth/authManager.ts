@@ -65,6 +65,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   private issuer: string | undefined;
   private lastProbeAt: number | undefined;
   private probe: Promise<AuthMode> | undefined;
+  private initializing: Promise<void> | undefined;
   private endpoints: { issuer: string; promise: Promise<FenceEndpoints> } | undefined;
 
   private session: StoredSession | undefined;
@@ -89,7 +90,12 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     this.storeSubscription = this.store.onDidChange(this.serverUrl, () => this.onStoreChanged());
   }
 
-  async initialize(): Promise<void> {
+  initialize(): Promise<void> {
+    this.initializing = this.runInitialize();
+    return this.initializing;
+  }
+
+  private async runInitialize(): Promise<void> {
     this.setContext('orchard.authRequired', false);
     await this.resolveMode(true);
     let stored = await this.store.read(this.serverUrl);
@@ -112,6 +118,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   async getHeaders(): Promise<AuthHeaders> {
+    await this.settle();
     if ((await this.resolveMode()) !== 'enabled') return {};
     if (!this.session) {
       this.applySession(await this.store.read(this.serverUrl));
@@ -126,6 +133,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   async isAuthenticated(): Promise<boolean> {
+    await this.settle();
     return (await this.resolveMode()) === 'enabled' && this.session !== undefined;
   }
 
@@ -134,7 +142,8 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   async reportUnauthorized(report: UnauthorizedReport): Promise<void> {
-    if (this.mode !== 'enabled') return;
+    await this.settle();
+    if (this.disposed || this.mode !== 'enabled') return;
     const rejected = this.session;
     if (
       report.tokenRejected &&
@@ -252,8 +261,17 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     return session;
   }
 
+  /** Waits for an in-flight initialize() and mode probe so callers never answer from a half-loaded state. */
+  private async settle(): Promise<void> {
+    if (this.initializing) {
+      await this.initializing.catch(() => undefined);
+    }
+    if (this.probe) await this.probe;
+  }
+
   private resolveMode(force = false): Promise<AuthMode> {
     if (this.mode !== 'unknown') return Promise.resolve(this.mode);
+    if (this.probe) return this.probe;
     if (
       !force &&
       this.lastProbeAt !== undefined &&
