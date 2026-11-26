@@ -4,6 +4,7 @@ declare module 'eventsource' {
     https?: object;
     proxy?: string;
     withCredentials?: boolean;
+    fetch?: typeof fetch;
   }
 
   class EventSource {
