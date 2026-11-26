@@ -134,12 +134,12 @@
         },
         {
           "command": "orchard.signIn",
-          "when": "view == orchard.groveExplorer",
+          "when": "view == orchard.groveExplorer && !orchard.signedIn",
           "group": "4_account"
         },
         {
           "command": "orchard.signOut",
-          "when": "view == orchard.groveExplorer",
+          "when": "view == orchard.groveExplorer && orchard.signedIn",
           "group": "4_account"
         }
       ],
