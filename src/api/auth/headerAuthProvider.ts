@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { AuthProvider } from './authProvider';
+import { AuthMode, AuthProvider } from './authProvider';
 import { CONFIG_CULTIVATOR_ID } from '../../constants';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,6 +30,18 @@ export class HeaderAuthProvider implements AuthProvider, vscode.Disposable {
     const cultivatorId = this.getCultivatorId();
     return !!cultivatorId && UUID_REGEX.test(cultivatorId);
   }
+
+  getMode(): AuthMode {
+    return 'disabled';
+  }
+
+  invalidate(): void {}
+
+  reportUnauthorized(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  reportAuthorized(): void {}
 
   private getCultivatorId(): string {
     return vscode.workspace
