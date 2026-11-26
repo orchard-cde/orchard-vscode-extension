@@ -12,10 +12,11 @@ export const CMD_GROVE_REFRESH = 'orchard.grove.refresh';
 export const CMD_GROVE_COPY_ID = 'orchard.grove.copyId';
 export const CMD_GROVE_SHOW_DETAILS = 'orchard.grove.showDetails';
 export const CMD_SHOW_DASHBOARD = 'orchard.showDashboard';
+export const CMD_SIGN_IN = 'orchard.signIn';
+export const CMD_SIGN_OUT = 'orchard.signOut';
 
 // Configuration keys
 export const CONFIG_SERVER_URL = 'orchard.serverUrl';
-export const CONFIG_CULTIVATOR_ID = 'orchard.cultivatorId';
 export const CONFIG_TROWEL_PATH = 'orchard.trowelPath';
 export const CONFIG_AUTO_REFRESH_INTERVAL = 'orchard.autoRefreshInterval';
 export const CONFIG_SSE_ENABLED = 'orchard.sseEnabled';

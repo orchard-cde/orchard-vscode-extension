@@ -37,6 +37,12 @@
         }
       ]
     },
+    "authentication": [
+      {
+        "id": "orchard",
+        "label": "Orchard"
+      }
+    ],
     "viewsWelcome": [
       {
         "view": "orchard.groveExplorer",
@@ -45,8 +51,13 @@
       },
       {
         "view": "orchard.groveExplorer",
+        "contents": "Sign in to Orchard to see your groves.\n[Sign In](command:orchard.signIn)",
+        "when": "orchard.configured && orchard.authRequired"
+      },
+      {
+        "view": "orchard.groveExplorer",
         "contents": "No groves found.\n[Create a Grove](command:orchard.grove.create)",
-        "when": "orchard.configured"
+        "when": "orchard.configured && !orchard.authRequired"
       }
     ],
     "commands": [
@@ -92,6 +103,16 @@
         "command": "orchard.showDashboard",
         "title": "Orchard: Show Dashboard",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "orchard.signIn",
+        "title": "Orchard: Sign In",
+        "icon": "$(sign-in)"
+      },
+      {
+        "command": "orchard.signOut",
+        "title": "Orchard: Sign Out",
+        "icon": "$(sign-out)"
       }
     ],
     "menus": {
@@ -110,6 +131,16 @@
           "command": "orchard.showDashboard",
           "when": "view == orchard.groveExplorer",
           "group": "navigation"
+        },
+        {
+          "command": "orchard.signIn",
+          "when": "view == orchard.groveExplorer",
+          "group": "4_account"
+        },
+        {
+          "command": "orchard.signOut",
+          "when": "view == orchard.groveExplorer",
+          "group": "4_account"
         }
       ],
       "view/item/context": [
@@ -157,11 +188,6 @@
           "type": "string",
           "default": "",
           "description": "Orchard Trellis server URL (e.g., https://orchard.example.com)"
-        },
-        "orchard.cultivatorId": {
-          "type": "string",
-          "default": "",
-          "description": "Cultivator UUID for authentication (must be a valid UUID)"
         },
         "orchard.trowelPath": {
           "type": "string",

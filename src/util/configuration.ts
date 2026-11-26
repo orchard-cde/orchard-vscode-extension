@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import {
   CONFIG_SERVER_URL,
-  CONFIG_CULTIVATOR_ID,
   CONFIG_TROWEL_PATH,
   CONFIG_AUTO_REFRESH_INTERVAL,
   CONFIG_SSE_ENABLED,
@@ -19,10 +18,6 @@ function stripPrefix(key: string): string {
 
 export function getServerUrl(): string {
   return getConfig().get<string>(stripPrefix(CONFIG_SERVER_URL), '');
-}
-
-export function getCultivatorId(): string {
-  return getConfig().get<string>(stripPrefix(CONFIG_CULTIVATOR_ID), '');
 }
 
 export function getTrowelPath(): string {

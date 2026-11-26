@@ -1,5 +1,4 @@
 export { AuthProvider } from './authProvider';
-export { HeaderAuthProvider } from './headerAuthProvider';
 export { AuthManager } from './authManager';
 export { SessionStore } from './sessionStore';
 export { FenceClient } from './fenceClient';

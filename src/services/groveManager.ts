@@ -53,6 +53,11 @@ export class GroveManager implements vscode.Disposable {
     this.updateSseSubscriptions();
   }
 
+  clearCache(): void {
+    this.groves.clear();
+    this._onDidChangeGroves.fire();
+  }
+
   /** Return all cached groves sorted by name. */
   getGroves(): GroveResponse[] {
     return Array.from(this.groves.values()).sort((a, b) =>

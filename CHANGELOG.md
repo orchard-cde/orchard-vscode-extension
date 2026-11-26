@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `Orchard: Sign In` and `Orchard: Sign Out` commands that authenticate to Trellis through the fence device flow
+- Orchard account in the VS Code Accounts menu
+
+### Changed
+- Requires VS Code 1.101 or later
+
+### Removed
+- `orchard.cultivatorId` setting
+
 ## 0.1.0 (Unreleased)
 
 ### Added

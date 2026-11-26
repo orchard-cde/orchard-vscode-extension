@@ -6,3 +6,5 @@ out/
 docs/superpowers/
 .context/
 .moderne/
+vitest.config.d.mts
+.vitest/
