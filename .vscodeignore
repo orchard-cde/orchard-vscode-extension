@@ -6,3 +6,6 @@ tsconfig.json
 webpack.config.js
 eslint.config.mjs
 docs/**
+.superpowers/**
+.claude/**
+.github/**
