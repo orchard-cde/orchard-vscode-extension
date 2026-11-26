@@ -30,7 +30,7 @@ vi.mock('vscode', () => {
 });
 
 vi.mock('eventsource', () => ({
-  default: class FakeEventSource {
+  EventSource: class FakeEventSource {
     close = vi.fn();
     addEventListener = vi.fn();
     onerror: (() => void) | null = null;

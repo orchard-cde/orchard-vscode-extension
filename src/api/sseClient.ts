@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import EventSource from 'eventsource';
+import { EventSource } from 'eventsource';
 import { AuthProvider } from './auth/authProvider';
 import { createAuthFetch } from './auth/authFetch';
 import { GroveStateChangedEvent } from './types';
