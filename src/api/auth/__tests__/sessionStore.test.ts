@@ -1,15 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-
-vi.mock('vscode', () => ({
-  Disposable: class {
-    constructor(private readonly fn: () => void) {}
-    dispose() {
-      this.fn();
-    }
-  },
-}));
-
-import type * as vscode from 'vscode';
 import {
   SessionStore,
   accountFromAccessToken,
@@ -17,32 +6,7 @@ import {
   sessionKey,
   type StoredSession,
 } from '../sessionStore';
-
-function fakeSecrets() {
-  const data = new Map<string, string>();
-  const listeners: Array<(e: { key: string }) => void> = [];
-  const secrets = {
-    get: async (key: string) => data.get(key),
-    store: async (key: string, value: string) => {
-      data.set(key, value);
-      listeners.forEach((l) => l({ key }));
-    },
-    delete: async (key: string) => {
-      data.delete(key);
-      listeners.forEach((l) => l({ key }));
-    },
-    onDidChange: (listener: (e: { key: string }) => void) => {
-      listeners.push(listener);
-      return {
-        dispose: () => {
-          const i = listeners.indexOf(listener);
-          if (i >= 0) listeners.splice(i, 1);
-        },
-      };
-    },
-  };
-  return { data, secrets: secrets as unknown as vscode.SecretStorage };
-}
+import { fakeSecrets, jwt } from '../../../__tests__/helpers';
 
 const session: StoredSession = {
   accessToken: 'a',
@@ -51,11 +15,6 @@ const session: StoredSession = {
   issuer: 'https://fence.example.com',
   account: { id: 'u1', label: 'user@example.com' },
 };
-
-function jwt(payload: unknown): string {
-  const seg = (v: unknown) => Buffer.from(JSON.stringify(v)).toString('base64url');
-  return `${seg({ alg: 'none' })}.${seg(payload)}.sig`;
-}
 
 describe('url helpers', () => {
   it('normalizeServerUrl trims and strips trailing slashes', () => {

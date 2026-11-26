@@ -28,25 +28,15 @@ vi.mock('vscode', () => {
   };
 });
 
-import * as vscode from 'vscode';
 import { AuthManager } from '../auth/authManager';
 import type { FenceClient } from '../auth/fenceClient';
 import { SessionStore, type StoredSession } from '../auth/sessionStore';
 import { TrellisClient } from '../trellisClient';
+import { fakeSecrets } from '../../__tests__/helpers';
 
 const SERVER = 'https://trellis.example.com';
 const ISSUER = 'https://fence.example.com';
 const NOW = 1_000_000;
-
-function fakeSecrets(initial: Record<string, string>) {
-  const data = new Map(Object.entries(initial));
-  return {
-    get: async (key: string) => data.get(key),
-    store: async (key: string, value: string) => void data.set(key, value),
-    delete: async (key: string) => void data.delete(key),
-    onDidChange: () => ({ dispose: () => undefined }),
-  } as unknown as vscode.SecretStorage;
-}
 
 describe('TrellisClient with a real AuthManager', () => {
   afterEach(() => {
@@ -62,7 +52,7 @@ describe('TrellisClient with a real AuthManager', () => {
       account: { id: 'u1', label: 'user@example.com' },
     };
     const store = new SessionStore(
-      fakeSecrets({ [`orchard.session:${SERVER}`]: JSON.stringify(stored) }),
+      fakeSecrets({ [`orchard.session:${SERVER}`]: JSON.stringify(stored) }).secrets,
     );
     const manager = new AuthManager({
       serverUrl: SERVER,

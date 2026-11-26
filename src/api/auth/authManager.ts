@@ -8,6 +8,8 @@ import {
   accountFromAccessToken,
   normalizeServerUrl,
 } from './sessionStore';
+import { describeError } from '../../util/errors';
+import { fetchWithTimeout } from '../../util/http';
 import * as logger from '../../util/logger';
 
 const REFRESH_SKEW_SECONDS = 30;
@@ -47,10 +49,6 @@ function isWebUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export class AuthManager implements AuthProvider, vscode.Disposable {
@@ -106,8 +104,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
 
   private async runInitialize(): Promise<void> {
     this.setContext('orchard.authRequired', false);
-    await this.resolveMode(true);
-    let stored = await this.store.read(this.serverUrl);
+    let [, stored] = await Promise.all([this.resolveMode(true), this.store.read(this.serverUrl)]);
     if (stored && this.mode === 'enabled' && stored.issuer !== this.issuer) {
       logger.info('Stored Orchard session was issued by a different authorization server; removing it');
       await this.store.delete(this.serverUrl);
@@ -228,16 +225,12 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       throw new Error('Sign-in failed: unsupported verification URL');
     }
 
-    try {
-      await vscode.env.clipboard.writeText(auth.userCode);
-    } catch (err) {
-      logger.warn(`Could not copy the sign-in code to the clipboard: ${describeError(err)}`);
-    }
-    try {
-      await vscode.env.openExternal(vscode.Uri.parse(verificationUri));
-    } catch (err) {
-      logger.warn(`Could not open the sign-in page: ${describeError(err)}`);
-    }
+    await this.bestEffort('copy the sign-in code to the clipboard', () =>
+      vscode.env.clipboard.writeText(auth.userCode),
+    );
+    await this.bestEffort('open the sign-in page', () =>
+      vscode.env.openExternal(vscode.Uri.parse(verificationUri)),
+    );
 
     const response = await vscode.window.withProgress(
       {
@@ -274,6 +267,14 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     return session;
   }
 
+  private async bestEffort(label: string, fn: () => Thenable<unknown> | void): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      logger.warn(`Could not ${label}: ${describeError(err)}`);
+    }
+  }
+
   /** Waits for an in-flight initialize() and mode probe so callers never answer from a half-loaded state. */
   private async settle(): Promise<void> {
     if (this.initializing) {
@@ -308,18 +309,23 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   private async probeMode(): Promise<AuthMode> {
     this.lastProbeAt = this.now();
     const url = `${this.serverUrl}/api/auth/config`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
     try {
-      const response = await this.fetchImpl(url, {
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      });
+      let body: unknown;
+      const readBody: typeof fetch = async (input, init) => {
+        const response = await this.fetchImpl(input, init);
+        if (response.ok) body = await response.json();
+        return response;
+      };
+      const response = await fetchWithTimeout(
+        readBody,
+        url,
+        { headers: { Accept: 'application/json' } },
+        CONFIG_TIMEOUT_MS,
+      );
       if (!response.ok) {
         logger.warn(`Auth discovery at ${url} returned HTTP ${response.status}`);
         return 'unknown';
       }
-      const body: unknown = await response.json();
       if (typeof body !== 'object' || body === null || !('issuer' in body)) {
         logger.warn(`Auth discovery at ${url} returned no issuer field`);
         return 'unknown';
@@ -338,8 +344,6 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       logger.warn(`Auth discovery at ${url} returned an invalid issuer`);
     } catch (err) {
       logger.warn(`Auth discovery at ${url} failed: ${describeError(err)}`);
-    } finally {
-      clearTimeout(timer);
     }
     return 'unknown';
   }
@@ -427,26 +431,33 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
       if (this.disposed) return undefined;
       stored = await this.store.read(this.serverUrl);
     }
-    if (stored && stored.refreshToken !== refreshToken) {
-      this.applySession(stored);
-      return stored;
-    }
-    if (stored) await this.store.delete(this.serverUrl);
-    logger.info(`Orchard session removed because ${reason}`);
-    this.applySession(undefined);
-    return undefined;
+    const removed = await this.reconcile(stored, (s) => s.refreshToken === refreshToken, reason);
+    return removed ? undefined : stored;
   }
 
   private async enforceIssuer(): Promise<void> {
     if (!this.session || this.session.issuer === this.issuer) return;
-    const stored = await this.store.read(this.serverUrl);
-    if (stored && stored.issuer === this.issuer) {
+    await this.reconcile(
+      await this.store.read(this.serverUrl),
+      (s) => s.issuer !== this.issuer,
+      'the authorization server changed',
+    );
+  }
+
+  /** Adopts `stored` unless stale; otherwise deletes it and clears the session, returning true. */
+  private async reconcile(
+    stored: StoredSession | undefined,
+    isStale: (s: StoredSession) => boolean,
+    reason: string,
+  ): Promise<boolean> {
+    if (stored && !isStale(stored)) {
       this.applySession(stored);
-      return;
+      return false;
     }
     if (stored) await this.store.delete(this.serverUrl);
-    logger.info('Orchard session removed because the authorization server changed');
+    logger.info(`Orchard session removed because ${reason}`);
     this.applySession(undefined);
+    return true;
   }
 
   private onStoreChanged(): void {

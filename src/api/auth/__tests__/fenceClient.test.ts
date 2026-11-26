@@ -6,18 +6,12 @@ import {
   FENCE_CLIENT_ID,
   type FenceEndpoints,
 } from '../fenceClient';
+import { json } from '../../../__tests__/helpers';
 
 const endpoints: FenceEndpoints = {
   deviceAuthorizationEndpoint: 'https://fence.example.com/oauth2/device_authorization',
   tokenEndpoint: 'https://fence.example.com/oauth2/token',
 };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
 
 function stub(response: Response | (() => Response)) {
   return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>

@@ -30,27 +30,21 @@ export class OrchardAuthenticationProvider implements vscode.AuthenticationProvi
     const previousSession = previous?.getSession();
     this.manager = manager;
     if (previous && previousSession) {
-      this.emitter.fire({ added: undefined, removed: [toSession(previous.serverUrl, previousSession)], changed: undefined });
+      this.fire(previous, { removed: previousSession });
     }
 
     if (!manager) return;
     this.subscription = manager.onDidChangeSession((change) => {
-      if (change.added) {
-        this.emitter.fire({ added: [toSession(manager.serverUrl, change.added)], removed: undefined, changed: undefined });
-      }
-      if (change.removed) {
-        this.emitter.fire({ added: undefined, removed: [toSession(manager.serverUrl, change.removed)], changed: undefined });
-      }
+      if (change.added) this.fire(manager, { added: change.added });
+      if (change.removed) this.fire(manager, { removed: change.removed });
     });
     const session = manager.getSession();
-    if (session) {
-      this.emitter.fire({ added: [toSession(manager.serverUrl, session)], removed: undefined, changed: undefined });
-    }
+    if (session) this.fire(manager, { added: session });
   }
 
   async getSessions(_scopes?: readonly string[]): Promise<vscode.AuthenticationSession[]> {
-    const session = this.manager?.getSession();
-    return this.manager && session ? [toSession(this.manager.serverUrl, session)] : [];
+    const current = this.currentSession();
+    return current ? [current] : [];
   }
 
   async createSession(_scopes: readonly string[]): Promise<vscode.AuthenticationSession> {
@@ -59,9 +53,8 @@ export class OrchardAuthenticationProvider implements vscode.AuthenticationProvi
   }
 
   async removeSession(sessionId: string): Promise<void> {
-    const session = this.manager?.getSession();
-    if (!this.manager || !session) return;
-    if (toSession(this.manager.serverUrl, session).id === sessionId) {
+    const current = this.currentSession();
+    if (this.manager && current?.id === sessionId) {
       await this.manager.signOut();
     }
   }
@@ -70,5 +63,18 @@ export class OrchardAuthenticationProvider implements vscode.AuthenticationProvi
     this.subscription?.dispose();
     this.subscription = undefined;
     this.emitter.dispose();
+  }
+
+  private currentSession(): vscode.AuthenticationSession | undefined {
+    const session = this.manager?.getSession();
+    return this.manager && session ? toSession(this.manager.serverUrl, session) : undefined;
+  }
+
+  private fire(manager: AuthManager, change: { added?: StoredSession; removed?: StoredSession }): void {
+    this.emitter.fire({
+      added: change.added ? [toSession(manager.serverUrl, change.added)] : undefined,
+      removed: change.removed ? [toSession(manager.serverUrl, change.removed)] : undefined,
+      changed: undefined,
+    });
   }
 }

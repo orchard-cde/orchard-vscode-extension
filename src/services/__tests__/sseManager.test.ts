@@ -45,6 +45,7 @@ import * as vscode from 'vscode';
 import * as logger from '../../util/logger';
 import { SseManager } from '../sseManager';
 import type { AuthProvider } from '../../api/auth/authProvider';
+import { flush } from '../../__tests__/helpers';
 
 function makeAuth() {
   const emitter = new vscode.EventEmitter<void>();
@@ -55,8 +56,6 @@ function makeAuth() {
   } as unknown as AuthProvider;
   return { auth, emitter };
 }
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('SseManager', () => {
   beforeEach(() => {

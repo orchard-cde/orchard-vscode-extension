@@ -48,6 +48,7 @@ import {
   type TokenResponse,
 } from '../fenceClient';
 import { SessionStore, type StoredSession } from '../sessionStore';
+import { fakeSecrets, flush, json } from '../../../__tests__/helpers';
 
 const SERVER = 'https://trellis.example.com/';
 const SERVER_NORM = 'https://trellis.example.com';
@@ -70,39 +71,6 @@ function session(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-function fakeSecrets() {
-  const data = new Map<string, string>();
-  const listeners: Array<(e: { key: string }) => void> = [];
-  const secrets = {
-    get: vi.fn(async (key: string) => data.get(key)),
-    store: async (key: string, value: string) => {
-      data.set(key, value);
-      listeners.forEach((l) => l({ key }));
-    },
-    delete: async (key: string) => {
-      data.delete(key);
-      listeners.forEach((l) => l({ key }));
-    },
-    onDidChange: (listener: (e: { key: string }) => void) => {
-      listeners.push(listener);
-      return {
-        dispose: () => {
-          const i = listeners.indexOf(listener);
-          if (i >= 0) listeners.splice(i, 1);
-        },
-      };
-    },
-  };
-  return { data, secrets, listeners };
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function configFetch(make: () => Response = () => json({ issuer: ISSUER })) {
   return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => make());
 }
@@ -110,8 +78,6 @@ function configFetch(make: () => Response = () => json({ issuer: ISSUER })) {
 function tokens(access: string, refresh?: string, expiresIn = 3600): TokenResponse {
   return { accessToken: access, refreshToken: refresh, expiresIn };
 }
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 function contextValues(key: string): unknown[] {
   return vi
@@ -132,9 +98,8 @@ interface Setup {
 
 function setup(opts: Setup = {}) {
   const { data, secrets, listeners } = fakeSecrets();
-  const vsSecrets = secrets as unknown as vscode.SecretStorage;
-  const store = new SessionStore(vsSecrets);
-  const otherWindow = new SessionStore(vsSecrets);
+  const store = new SessionStore(secrets);
+  const otherWindow = new SessionStore(secrets);
   if (opts.stored) data.set(`orchard.session:${SERVER_NORM}`, JSON.stringify(opts.stored));
   const fence = {
     discover: vi.fn(async (_issuer: string) => endpoints),
@@ -380,7 +345,7 @@ describe('getHeaders', () => {
     const s = setup();
     await s.manager.initialize();
     expect(await s.manager.getHeaders()).toEqual({});
-    s.secrets.get.mockClear();
+    vi.mocked(s.secrets.get).mockClear();
     expect(await s.manager.getHeaders()).toEqual({});
     expect(s.secrets.get).toHaveBeenCalledTimes(1);
   });

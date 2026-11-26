@@ -60,6 +60,7 @@ import {
   type TokenResponse,
 } from '../fenceClient';
 import { SessionStore, type StoredSession } from '../sessionStore';
+import { fakeSecrets, json, jwt } from '../../../__tests__/helpers';
 
 const SERVER = 'https://trellis.example.com/';
 const SERVER_NORM = 'https://trellis.example.com';
@@ -71,11 +72,6 @@ const endpoints: FenceEndpoints = {
   deviceAuthorizationEndpoint: `${ISSUER}/oauth2/device_authorization`,
   tokenEndpoint: `${ISSUER}/oauth2/token`,
 };
-
-function jwt(payload: Record<string, unknown>): string {
-  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
-  return `${enc({ alg: 'none' })}.${enc(payload)}.sig`;
-}
 
 const ACCESS = jwt({ sub: 'u-42', email: 'dev@example.com' });
 
@@ -103,34 +99,6 @@ function signedInSession(): StoredSession {
     issuer: ISSUER,
     account: { id: 'u-42', label: 'dev@example.com' },
   };
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-function fakeSecrets() {
-  const data = new Map<string, string>();
-  const listeners: Array<(e: { key: string }) => void> = [];
-  const secrets = {
-    get: async (key: string) => data.get(key),
-    store: async (key: string, value: string) => {
-      data.set(key, value);
-      listeners.forEach((l) => l({ key }));
-    },
-    delete: async (key: string) => {
-      data.delete(key);
-      listeners.forEach((l) => l({ key }));
-    },
-    onDidChange: (listener: (e: { key: string }) => void) => {
-      listeners.push(listener);
-      return { dispose: () => listeners.splice(listeners.indexOf(listener), 1) };
-    },
-  };
-  return { data, secrets };
 }
 
 function cancellationSource() {
@@ -165,7 +133,7 @@ interface Setup {
 
 function setup(opts: Setup = {}) {
   const { data, secrets } = fakeSecrets();
-  const store = new SessionStore(secrets as unknown as vscode.SecretStorage);
+  const store = new SessionStore(secrets);
   if (opts.stored) data.set(`orchard.session:${SERVER_NORM}`, JSON.stringify(opts.stored));
   const fence = {
     discover: vi.fn(async (_issuer: string) => endpoints),

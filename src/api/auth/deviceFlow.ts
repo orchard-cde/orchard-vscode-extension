@@ -7,6 +7,7 @@ import {
   FenceTransportError,
   TokenResponse,
 } from './fenceClient';
+import { describeError } from '../../util/errors';
 import * as logger from '../../util/logger';
 
 const MIN_POLL_SECONDS = 5;
@@ -60,7 +61,7 @@ export async function pollForToken(
         continue;
       }
       if (!(err instanceof FenceError)) {
-        throw new Error(`Sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(`Sign-in failed: ${describeError(err)}`);
       }
       switch (err.code) {
         case 'authorization_pending':

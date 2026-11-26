@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthMode, AuthProvider } from '../auth/authProvider';
 import { TrellisClient } from '../trellisClient';
 import { TrellisApiError } from '../types';
+import { json } from '../../__tests__/helpers';
 
 const BASE = 'http://trellis.test';
 
@@ -19,10 +20,6 @@ function makeAuth(mode: AuthMode, tokens: Array<string | undefined>): AuthProvid
     reportAuthorized: vi.fn(),
     onDidChangeAuthentication: vi.fn(),
   } as unknown as AuthProvider;
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
 }
 
 function unauthorized(): Response {

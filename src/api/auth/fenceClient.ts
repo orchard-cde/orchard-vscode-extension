@@ -1,3 +1,6 @@
+import { describeError } from '../../util/errors';
+import { FetchTimeoutError, fetchWithTimeout } from '../../util/http';
+
 export const FENCE_CLIENT_ID = 'trowel-cli';
 
 const DEVICE_CODE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -155,28 +158,20 @@ export class FenceClient {
   }
 
   private async send(url: string, init: RequestInit): Promise<JsonObject> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-
+    let text = '';
     let status: number;
-    let text: string;
     try {
-      const response = await this.fetchImpl(url, { ...init, signal: controller.signal });
-      status = response.status;
-      text = await response.text();
+      const readBody: typeof fetch = async (input, requestInit) => {
+        const response = await this.fetchImpl(input, requestInit);
+        text = await response.text();
+        return response;
+      };
+      status = (await fetchWithTimeout(readBody, url, init, this.timeoutMs)).status;
     } catch (err) {
-      if (controller.signal.aborted) {
-        throw new FenceTransportError(
-          `fence request timed out after ${this.timeoutMs} ms`,
-          err,
-        );
+      if (err instanceof FetchTimeoutError) {
+        throw new FenceTransportError(`fence request timed out after ${this.timeoutMs} ms`, err);
       }
-      throw new FenceTransportError(
-        `fence request failed: ${err instanceof Error ? err.message : String(err)}`,
-        err,
-      );
-    } finally {
-      clearTimeout(timer);
+      throw new FenceTransportError(`fence request failed: ${describeError(err)}`, err);
     }
 
     let parsed: unknown;
