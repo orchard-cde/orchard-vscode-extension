@@ -210,6 +210,12 @@ describe('initialize', () => {
     expect(s.authChanges()).toBe(0);
   });
 
+  it('initialize() clears orchard.authRequired', async () => {
+    const s = setup();
+    await s.manager.initialize();
+    expect(contextValues('orchard.authRequired')).toEqual([false]);
+  });
+
   it('constructor alone reads nothing from the store', async () => {
     const s = setup({ stored: session() });
     await flush();
@@ -616,14 +622,14 @@ describe('reporting', () => {
     const disabled = setup({ stored: session(), fetchImpl: configFetch(() => json({ issuer: null })) });
     await disabled.manager.initialize();
     await disabled.manager.reportUnauthorized({ tokenRejected: true });
-    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(contextValues('orchard.authRequired')).toEqual([false]);
     expect(disabled.signInRequests()).toBe(0);
     expect(await disabled.persisted()).toEqual(session());
 
     const unknown = setup({ stored: session(), fetchImpl: configFetch(() => new Response('x', { status: 500 })) });
     await unknown.manager.initialize();
     await unknown.manager.reportUnauthorized({ tokenRejected: true });
-    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, false]);
     expect(unknown.signInRequests()).toBe(0);
     expect(await unknown.persisted()).toEqual(session());
   });
@@ -665,7 +671,7 @@ describe('reporting', () => {
     expect(s.manager.getSession()).toEqual(moved);
     expect(await s.persisted()).toEqual(moved);
     expect(s.signInRequests()).toBe(0);
-    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(contextValues('orchard.authRequired')).toEqual([false]);
     expect(s.changes).toEqual([{ added: session() }]);
     expect(await s.manager.getHeaders()).toEqual({ Authorization: 'Bearer access-b' });
   });
@@ -681,7 +687,7 @@ describe('reporting', () => {
     expect(await s.persisted()).toEqual(rotated);
     expect(s.manager.getSession()).toEqual(rotated);
     expect(s.signInRequests()).toBe(0);
-    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(contextValues('orchard.authRequired')).toEqual([false]);
 
     await s.manager.reportUnauthorized({ tokenRejected: true, rejectedAccessToken: 'access-2' });
     expect(await s.persisted()).toBeUndefined();
@@ -694,9 +700,9 @@ describe('reporting', () => {
     await s.manager.initialize();
     await s.manager.reportUnauthorized({ tokenRejected: false });
     s.manager.reportAuthorized();
-    expect(contextValues('orchard.authRequired')).toEqual([true, false]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, true, false]);
     s.manager.reportAuthorized();
-    expect(contextValues('orchard.authRequired')).toEqual([true, false]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, true, false]);
   });
 
   it('setting a context key never throws when the command rejects', async () => {
@@ -720,10 +726,10 @@ describe('signOut', () => {
     expect(s.changes).toEqual([{ added: session() }, { removed: session() }]);
     expect(s.authChanges()).toBe(2);
     expect(lastContext('orchard.signedIn')).toBe(false);
-    expect(contextValues('orchard.authRequired')).toEqual([]);
+    expect(contextValues('orchard.authRequired')).toEqual([false]);
 
     await s.manager.reportUnauthorized({ tokenRejected: false });
     expect(s.signInRequests()).toBe(0);
-    expect(contextValues('orchard.authRequired')).toEqual([true]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, true]);
   });
 });

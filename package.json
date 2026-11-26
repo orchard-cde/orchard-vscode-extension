@@ -225,7 +225,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "webpack --mode production",
+    "vscode:prepublish": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && webpack --mode production",
     "compile": "webpack --mode development",
     "watch": "webpack --mode development --watch",
     "lint": "eslint src",

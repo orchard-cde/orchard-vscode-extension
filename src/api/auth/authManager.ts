@@ -90,6 +90,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   async initialize(): Promise<void> {
+    this.setContext('orchard.authRequired', false);
     await this.resolveMode(true);
     let stored = await this.store.read(this.serverUrl);
     if (stored && this.mode === 'enabled' && stored.issuer !== this.issuer) {

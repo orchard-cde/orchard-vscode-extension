@@ -558,7 +558,7 @@ describe('signIn', () => {
     await s.manager.initialize();
     await s.manager.reportUnauthorized({ tokenRejected: false });
     expect(s.signInRequests()).toBe(1);
-    expect(contextValues('orchard.authRequired')).toEqual([true]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, true]);
     s.fence.pollDeviceToken.mockResolvedValueOnce(tokens());
     vi.useFakeTimers();
     const promise = s.manager.signIn();
@@ -567,7 +567,7 @@ describe('signIn', () => {
     expect(s.changes).toEqual([{ added: signedInSession() }]);
     expect(s.authChanges()).toBe(1);
     expect(contextValues('orchard.signedIn').at(-1)).toBe(true);
-    expect(contextValues('orchard.authRequired')).toEqual([true, false]);
+    expect(contextValues('orchard.authRequired')).toEqual([false, true, false]);
     await vi.advanceTimersByTimeAsync(0);
     expect(s.changes).toHaveLength(1);
 
