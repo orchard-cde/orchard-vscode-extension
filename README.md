@@ -13,7 +13,7 @@ Manage Orchard Cloud Development Environments from VS Code.
 
 ## Requirements
 
-- VS Code 1.101 or later
+- VS Code 1.146 or later
 - [Remote - SSH](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension
 - Access to an Orchard Trellis server
 

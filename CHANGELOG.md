@@ -7,7 +7,7 @@
 - Orchard account in the VS Code Accounts menu
 
 ### Changed
-- Requires VS Code 1.101 or later
+- Requires VS Code 1.146 or later
 
 ### Removed
 - `orchard.cultivatorId` setting; authentication now uses fence sign-in
