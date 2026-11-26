@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
 import { AuthMode, AuthProvider, UnauthorizedReport } from './authProvider';
-import { FenceClient, FenceEndpoints, FenceError } from './fenceClient';
-import { SessionStore, StoredSession, normalizeServerUrl } from './sessionStore';
+import { pollForToken } from './deviceFlow';
+import { DeviceAuthorization, FenceClient, FenceEndpoints, FenceError } from './fenceClient';
+import {
+  SessionStore,
+  StoredSession,
+  accountFromAccessToken,
+  normalizeServerUrl,
+} from './sessionStore';
 import * as logger from '../../util/logger';
 
 const REFRESH_SKEW_SECONDS = 30;
@@ -69,6 +75,8 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
 
   private authRequired = false;
   private signInPromptShown = false;
+  private signingIn: Promise<StoredSession> | undefined;
+  private disposed = false;
 
   constructor(opts: AuthManagerOptions) {
     this.serverUrl = normalizeServerUrl(opts.serverUrl);
@@ -153,8 +161,15 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     if (this.authRequired) this.setAuthRequired(false);
   }
 
-  async signIn(): Promise<StoredSession> {
-    throw new Error('not implemented');
+  signIn(): Promise<StoredSession> {
+    if (this.signingIn) {
+      void vscode.window.showInformationMessage('Sign-in is already in progress.');
+      return this.signingIn;
+    }
+    this.signingIn = this.runSignIn().finally(() => {
+      this.signingIn = undefined;
+    });
+    return this.signingIn;
   }
 
   async signOut(): Promise<void> {
@@ -166,10 +181,73 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.storeSubscription.dispose();
     this._onDidChangeSession.dispose();
     this._onDidChangeAuthentication.dispose();
     this._onDidRequireSignIn.dispose();
+  }
+
+  private async runSignIn(): Promise<StoredSession> {
+    if (this.mock) throw new Error('Sign-in is not available in mock mode');
+    const mode = await this.resolveMode(true);
+    if (mode === 'disabled') throw new Error('This Orchard server has authentication disabled');
+    if (mode === 'unknown') throw new Error('Could not reach the Orchard server to start sign-in');
+    const issuer = this.issuer as string;
+
+    let endpoints: FenceEndpoints;
+    let auth: DeviceAuthorization;
+    try {
+      endpoints = await this.getEndpoints();
+      auth = await this.fence.requestDeviceAuthorization(endpoints);
+    } catch (err) {
+      throw new Error(`Sign-in failed: ${describeError(err)}`);
+    }
+
+    try {
+      await vscode.env.clipboard.writeText(auth.userCode);
+    } catch (err) {
+      logger.warn(`Could not copy the sign-in code to the clipboard: ${describeError(err)}`);
+    }
+    const verificationUri = auth.verificationUriComplete ?? auth.verificationUri;
+    try {
+      await vscode.env.openExternal(vscode.Uri.parse(verificationUri));
+    } catch (err) {
+      logger.warn(`Could not open the sign-in page: ${describeError(err)}`);
+    }
+
+    const response = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Signing in to Orchard. Confirm code ${auth.userCode} in your browser.`,
+        cancellable: true,
+      },
+      (_progress, token) =>
+        pollForToken(this.fence, endpoints, auth, token, { isCancelled: () => this.disposed }),
+    );
+
+    if (!response.refreshToken) {
+      throw new Error('Sign-in failed: the authorization server returned no refresh token');
+    }
+    let account: StoredSession['account'];
+    try {
+      account = accountFromAccessToken(response.accessToken);
+    } catch (err) {
+      throw new Error(`Sign-in failed: ${describeError(err)}`);
+    }
+    const session: StoredSession = {
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      expiresAt: this.now() + response.expiresIn,
+      issuer,
+      account,
+    };
+    await this.store.write(this.serverUrl, session);
+    this.applySession(session);
+    this.setAuthRequired(false);
+    this.signInPromptShown = false;
+    logger.info('Signed in to Orchard');
+    return session;
   }
 
   private resolveMode(force = false): Promise<AuthMode> {
@@ -258,7 +336,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     try {
       const endpoints = await this.getEndpoints();
       const response = await this.fence.refresh(endpoints, refreshToken);
-      if (generation !== this.signOutGeneration) return {};
+      if (this.disposed || generation !== this.signOutGeneration) return {};
       const next: StoredSession = {
         ...base,
         accessToken: response.accessToken,
@@ -266,7 +344,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
         expiresAt: this.now() + response.expiresIn,
       };
       await this.store.write(this.serverUrl, next);
-      if (generation !== this.signOutGeneration) return {};
+      if (this.disposed || generation !== this.signOutGeneration) return {};
       this.applySession(next);
       return bearer(next);
     } catch (err) {
@@ -300,6 +378,7 @@ export class AuthManager implements AuthProvider, vscode.Disposable {
     let stored = await this.store.read(this.serverUrl);
     if (stored && stored.refreshToken === refreshToken && graceMs > 0) {
       await delay(graceMs);
+      if (this.disposed) return undefined;
       stored = await this.store.read(this.serverUrl);
     }
     if (stored && stored.refreshToken !== refreshToken) {

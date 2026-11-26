@@ -727,10 +727,3 @@ describe('signOut', () => {
     expect(contextValues('orchard.authRequired')).toEqual([true]);
   });
 });
-
-describe('signIn', () => {
-  it('is not implemented yet', async () => {
-    const s = setup();
-    await expect(s.manager.signIn()).rejects.toThrow('not implemented');
-  });
-});
